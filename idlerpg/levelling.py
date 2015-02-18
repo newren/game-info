@@ -24,6 +24,7 @@ def convert_to_duration(days, hours, mins, secs):
 level = {}    # who_string -> level_number
 online = {}   # who_string -> boolean (well, False or True or None=unknown)
 timeleft = {} # who_string -> seconds_left
+itemsum = {}  # who_string -> latest_battle_itemsum
 player = {}  # ircnick -> who_string
 quest_started = None  # time_string or None
 quest_times = []
@@ -102,31 +103,6 @@ with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
       continue
 
     #
-    # Check for going offline
-    #
-
-    # Just a single user quitting
-    m = re.match(r'(?P<postdate>[\d-]{10} [\d:]{8}) \*\s*(?P<nick>.*) has (?:quit|left)', line)
-    if m:
-      nick = m.group('nick')
-      post_epoch = convert_to_epoch(m.group('postdate'))
-      adjust_timeleft(player.get(nick), post_epoch)
-      if nick in player:
-        online[player[nick]] = False
-      continue
-
-    # I got disconnected somehow
-    m = re.match(r'\*\*\*\* ENDING LOGGING AT (.*)', line)
-    if m:
-      enddate = m.group(1)
-      timetuple = datetime.strptime(enddate, '%a %b %d %H:%M:%S %Y').timetuple()
-      post_epoch = time.mktime(timetuple)
-      for who in online:
-        adjust_timeleft(who, post_epoch)
-        online[who] = None
-      continue
-
-    #
     # Various checks for time-to-next-level
     #
 
@@ -135,6 +111,7 @@ with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
     if m:
       who = m.group('who')
       level[who] = '0'
+      itemsum[who] = 0
       online[who] = True
       player[m.group('nick')] = who
       handle_timeleft(m)
@@ -175,6 +152,43 @@ with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
         handle_timeleft(m)
       continue
 
+    #
+    # Check for going offline
+    #
+
+    # Just a single user quitting
+    m = re.match(r'(?P<postdate>[\d-]{10} [\d:]{8}) \*\s*(?P<nick>.*) has (?:quit|left)', line)
+    if m:
+      nick = m.group('nick')
+      post_epoch = convert_to_epoch(m.group('postdate'))
+      adjust_timeleft(player.get(nick), post_epoch)
+      if nick in player:
+        online[player[nick]] = False
+      continue
+
+    # I got disconnected somehow
+    m = re.match(r'\*\*\*\* ENDING LOGGING AT (.*)', line)
+    if m:
+      enddate = m.group(1)
+      timetuple = datetime.strptime(enddate, '%a %b %d %H:%M:%S %Y').timetuple()
+      post_epoch = time.mktime(timetuple)
+      for who in online:
+        adjust_timeleft(who, post_epoch)
+        online[who] = None
+      continue
+
+    #
+    # Check for itemsums
+    #
+
+    # Just a single user quitting
+    m = re.match(postdate_re+r"(?P<attacker>.*) \[\d+/(?P<attacker_sum>\d+)\] has (?:challenged|come upon) (?P<defender>.*) \[\d+/(?P<defender_sum>\d+)\]", line)
+    if m:
+      postdate, attacker, attacker_sum, defender, defender_sum = m.groups()
+      itemsum[attacker] = int(attacker_sum)
+      itemsum[defender] = int(defender_sum)
+      continue
+
 def time_format(seconds):
   sign = '-' if seconds<0 else ' '
   seconds = -1*seconds if seconds < 0 else seconds
@@ -204,8 +218,8 @@ def quest_info(started, time_left, quest_times):
   else:
     return "None"
 
-print "Lvl On?  Time-to-Lvl character"
-print "--- --- ------------ ---------"
+print "Lvl On? ISum  Time-to-Lvl character"
+print "--- --- ---- ------------ ---------"
 for who in sorted(timeleft, key=lambda x:(online[x],timeleft[x])):
-  print('{:>3s} {:3s} {} {}'.format(level[who], 'yes' if online[who] else 'no', time_format(timeleft[who]), who))
+  print('{:>3s} {:3s} {:4d} {} {}'.format(level[who], 'yes' if online[who] else 'no', itemsum[who], time_format(timeleft[who]), who))
 print("Quest: "+quest_info(quest_started, quest_time_left, quest_times))
