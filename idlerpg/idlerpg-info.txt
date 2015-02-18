@@ -1,0 +1,120 @@
+Good:
+  10% boost
+  day/12 5-12% cut in time with friend
+  1/50 chance to land critical strike
+
+Bad:
+  10% detriment
+  day/16 'attempt' steal item from good user
+  day/16 1-5% addition to TTL
+  1/20 chance to land critical strike
+
+Battles; Win: boost of OL/400*TTL + 2% chance to steal an item; Lose: detriment of OL/700*TTL
+
+1 battle/hour among level 45 characters
+1.4 battles/day from grid system
+.25 team battles/day (no stealing in team battles)
+
+Total: 29.4 battles/day
+13 users level 45 and higher
+
+So: 29.4/13 = 2.26 personally initiated battles per day
+
+Assuming itemsum = 1/3 average_item_sum
+     Effective itemsum  |  Odds to win      |  Days per being Stealer  |  Days per Stealee
+  G   1.1*itemsum          1.1/4.1 = 0.268     82.55                      30.22
+  N       itemsum          1.0/4.0 = 0.25      88.50                      29.50
+  E   0.9*itemsum          0.9/3.9 = 0.231     95.77                      28.77
+
+Assuming itemsum = 1/2 average_item_sum
+     Effective itemsum  |  Odds to win      |  Days per being Stealer  |  Days per Stealee
+  G   1.1*itemsum          1.1/3.1 = 0.355     62.32                      34.30
+  N       itemsum          1.0/3.0 = 0.333     66.44                      33.17
+  E   0.9*itemsum          0.9/2.9 = 0.310     71.37                      32.06
+
+Assuming itemsum = 1/1 average_item_sum
+     Effective itemsum  |  Odds to win      |  Days per being Stealer  |  Days per Stealee
+  G   1.1*itemsum          1.1/2.1 = 0.524     42.24                      46.46
+  N       itemsum          1.0/2.0 = 0.500     44.25                      44.25
+  E   0.9*itemsum          0.9/1.9 = 0.474     46.71                      42.04
+
+  Notes:
+    Odds to win = effective itemsum/(effective itemsum + average itemsum)
+    Days per being Stealer = 1/Steals_per_day = 1/(initiated battles per day * odds to win * .02)
+    Days per being Stealee = 1/Stoles_per_day = 1/(initiated battles per day * odds to lose * .02)
+
+Note: If you win 25% of battles with good alignment, you'll only win 20.45% with evil alignment
+
+
+guys less than level 19 cannot be stolen from in battle
+primnick cannot be stolen from in battle
+if randomly selected item (out of 10) of other person is lower level than yours, it will not be stolen
+for random battles, odds of attempted steal = 1/25 * (1 - critical_strike%)
+  critical_strike% = 1/odds[alignment], where odds={good=>50, neutral=>35, evil=>20}
+for collision battles, odds of attempted steal = 1/25 * (1 - 1/35)
+either way, odds of attempted steal are just slightly less than .04
+
+nightly-sneak-attempts are 1/16 per day (1/8 per day of evilness, but half of those are forsakings)
+
+one-on-one battles are always initiated by one of the two players, so they-initiated=50%, you-initiated=50%
+
+#stolen = #battles * they-initiated% * losing% * attempted-steal% * 1-(your-items-lower-value%)
+#steals = #battles * you-initiated% * winning% * attempted-steal% *    your-items-lower-value%
+        + #nightly-sneak-attempts * your-items-lower-value%
+
+So, assuming 5 battles/day, and an itemsum 1/3 that of others, neutral
+alignment, and all 90% of our items have a lower value:
+
+  Good:
+    #stolen = 5/day * .5 * ~.73 * ~.0389 *    .1                = ~.0071/day  (stolen from once every 140.9 days)
+    #steals = 5/day * .5 * ~.27 *  .0392 *    .9  + 0*.9        =  .0238/day  (steal       once every  42.0 days)
+
+  Neutral:
+    #stolen = 5/day * .5 *  .75 * ~.0389 *    .1                = ~.0073/day  (stolen from once every 137.1 days)
+    #steals = 5/day * .5 *  .25 *  .0389 *    .9  + 0*.9        =  .0219/day  (steal       once every  45.7 days)
+
+  Evil:
+    #stolen = 5/day * .5 * ~.77 * ~.0389 *    .1                = ~.0075/day  (stolen from once every 133.5 days)
+    #steals = 5/day * .5 * ~.23 *  .0380 *    .9  + 1/16 day*.9 =  .0759/day  (steal       once every  13.2 days)
+  
+
+Also:
+  1/80 days, one of /amulet/charm/weapon/tunic/set of leggings/shield/ lose 10% effectiveness
+  1/40 days, one of /amulet/charm/weapon/tunic/set of leggings/shield/ gain 10% effectiveness
+  So, on average, every 80*6 days, all six of those items effectiveness increase by a factor of 1.1*1.1*0.9=1.089
+  So, long term, each of those six items gains .01776% effectivness/day (1.0001776**480 = 1.089), or 6.698%/year
+Kinda interesting:
+  1-reduce(operator.mul, [1-1.4**(-x/4.0) for x in xrange(75,1000)], 1)
+
+
+odds win * benefit = odds lose * detriment
+
+benefit = 7/4 * detriment
+odds lose = 1-odds win
+
+odds win = 4/7 / (1+4/7) = 4/7 / (11/7) = 4/11
+
+4/11 * 7/4 =? 7/11  !
+x/(1+x) * 7/4 = 1/(1+x)*1
+
+7/4*x = 1
+x = 4/7
+
+
+Atychiphobe the Coward  (logs out most the time when selected for quest and elijah isn't among questers; needs to be level >= 40)
+Yojoe the Local (just an awesome choice)
+
+
+
+  Item types       Calamity?  SpecialVersion?
+  ---------------
+  charm               Y
+  shield              Y
+  set of leggings     Y
+  weapon              Y         Yx3-150,175;175,200;300,350
+  amulet              Y           Y-100,125
+  tunic               Y           Y- 75,100
+  ring                            Y- 50, 75
+  helm                            Y- 50, 75
+  pair of boots                   Y-250,300
+  pair of gloves
