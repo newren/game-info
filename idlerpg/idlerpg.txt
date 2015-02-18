@@ -1,0 +1,57 @@
+Determining what battle-adjusted itemsums folks have used over time:
+   cat ~/.xchat2/xchatlogs/Palantir-#idlerpg.log | grep -v 'team battled' | grep -o '[A-Za-z0-9]* \[[0-9/]*\]' | sort -k 1,1 -s | sed -e s#[0-9]*/## | uniq -c | less
+
+Determining the latest battle-adjusted itemsums folks are now using:
+   cat ~/.xchat2/xchatlogs/Palantir-#idlerpg.log | grep -v 'team battled' | grep -o '[A-Za-z0-9]* \[[0-9/]*\]' | sort -k 1,1 -s | sed -e s#[0-9]*/## | tr -d '[]' | uniq -c | awk '{cnt[$2]=$3} END{for (x in cnt){print cnt[x],x}}' | sort -n | less
+
+Determining what level everyone has attained:
+   grep 'has attained' ~/.xchat2/xchatlogs/Palantir-#idlerpg.log | sed -e 's/.*idlerpg>\s*//' -e 's/,[^,]*, has attained//' -e 's/!.*//' | awk '{cnt[$1]=$3} END{for (x in cnt){print cnt[x],x}}' | sort -n | less
+
+Determining alignment; combination of (the first only goes back to when my logs started)
+   grep alignment ~/.xchat2/xchatlogs/Palantir-#idlerpg.log | awk '{print $5 " => " $10'} | less
+   grep forsaken ~/.xchat2/xchatlogs/Palantir-#idlerpg.log | awk {print\$5} | sort | uniq -c
+   grep prayed ~/.xchat2/xchatlogs/Palantir-#idlerpg.log | sed -e 's/.*[^A-Za-z]\([A-Za-z].*\) and \(.*\) have not let.*/\1 \2/' | tr ' ' '\n' | sort | uniq -c
+   
+
+grep '<idlerpg>' ~/.xchat2/xchatlogs/Palantir-#idlerpg.log | grep -v -e 'has come upon' -e 'Critical Strike' -e 'has challenged .* in combat' -e 'has attained level' -e 'uest to end' -e 'reaches next level' -e 'Next level in' -e 'This terrible calamity' -e 'This wondrous godsend' -e 'completing their quest' -e 'Idle RPG Top Players' -e 'have team battled' -e 'completed their journey' -e '10%.* effectiveness' -e 'have been chosen by the gods' -e 'In the fierce battle' -e 'blessed hand of God' -e 'prayed to their god' -e 'His little finger among them' -e 'prudence and self-regard' 
+
+ 'has come upon' 
+ 'Critical Strike' 
+ 'has challenged .* in combat' 
+ 'has attained level' 
+ 'uest to end' 
+ 'reaches next level' 
+ 'Next level in' 
+ 'This terrible calamity' 
+ 'This wondrous godsend' 
+ 'completing their quest' 
+ 'Idle RPG Top Players' 
+ 'have team battled' 
+ 'completed their journey' 
+ 'idlerpg gives voice to' 
+ '10%.* effectiveness' 
+ 'have been chosen by the gods' 
+ 'In the fierce battle' 
+ 'blessed hand of God' 
+ 'prayed to their god' 
+ 'His little finger among them' 
+ 'prudence and self-regard' ~/.xchat2/xchatlogs/Palantir-#idlerpg.log
+
+
+grep -e 'Luck is with you' -e 'The light of the gods' ~/.xchat2/xchatlogs/Palantir-idlerpg.log | grep -o 'level [^,!]*!' | tac | perl -nle 'print if not $seen{(split(/ /, $_, 3))[2]}++' | sort -k 2 -n
+
+   or tack the following on the end of the above: | grep -v tunic | awk '{sum+=$2} END{print sum}'
+
+(grep -e 'Luck is with you' -e 'The light of the gods' ~/.xchat2/xchatlogs/Palantir-idlerpg.log; grep 'elijah picks it up' -e 'elijah stole ' ~/.xchat2/xchatlogs/Palantir-#idlerpg.log) | grep -o 'level [^,!]*!' | tac | perl -nle 'print if not $seen{(split(/ /, $_, 3))[2]}++' | sort -k 2 -n
+
+   or tack the following on the end of the above: | grep -v '[0-9]\+ [A-Z]' | awk '{sum+=$2} END{print sum}'
+
+The above assumes any special items I got were later replaced by fierce
+battles or steals, assumes that any steals or fierce battle-obtained-items
+weren't ever later replaced by an item after going up to a new level,
+assumes that I've never had an item taken from me in a fierce battle (false
+-- pair of boots), and ignores blessings/cursings on my items.
+
+scatterplot:
+  TTL vs actual-TTL  (maybe also itemsum vs. average itemsum,alignment,current-level,etc.)
+  
