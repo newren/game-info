@@ -199,7 +199,7 @@ def time_format(seconds):
   mins = int(seconds/60)
   seconds = int(seconds%60)
   daystr = sign+str(days)
-  return '{:>4s}:{:02d}:{:02d}:{:02d}'.format(sign+str(days),hours,mins,seconds)
+  return '{:>3s}:{:02d}:{:02d}:{:02d}'.format(sign+str(days),hours,mins,seconds)
 
 def quest_info(started, time_left, quest_times):
   if started:
