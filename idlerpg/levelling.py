@@ -12,9 +12,9 @@ def convert_to_epoch(timestring):
 def convert_to_duration(days, hours, mins, secs):
   return 86400*int(days) + 3600*int(hours) + 60*int(mins) + int(secs)
 
-level = {}  # who_string -> level_number
-online = {} # who_string -> boolean (well, False or True or None=unknown)
-info = {}   # who_string -> tuple_values
+level = {}    # who_string -> level_number
+online = {}   # who_string -> boolean (well, False or True or None=unknown)
+timeleft = {} # who_string -> seconds_left
 player = {}  # ircnick -> who_string
 quest_started = None  # time_string or None
 quest_times = []
@@ -43,15 +43,8 @@ def handle_timeleft(m):
   post_delta = convert_to_duration(days, hours, mins, secs)
   now_delta = (post_epoch+post_delta)-now
 
-  # Guess whether the character is online based on time instead of trying
-  # to parse "has left" messages (netsplits happen too, and thus I might not
-  # get those messages); if the amount of time they have left is positive,
-  # just assume they're online.  They're certainly not online if the amount
-  # of time left is negative, because idlerpg would have levelled them up.
-  online_guess = now_delta > 0 # now-post_epoch < post_delta
-  second_guess = now-post_epoch < 2*86400
+  timeleft[who] = now_delta
 
-  info[who] = (level[who], now_delta, post_delta, online_guess)
 
 with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
   for line in f:
@@ -195,10 +188,7 @@ def quest_info(started, time_left, quest_times):
 print "Warning: recent realm wide penalties and quest completions ignored\n"
 print "Lvl  Time-to-Lvl character"
 print "--- ------------ ---------"
-for who in sorted(info, key=lambda x:info[x][1]):
-  level[who], now_delta, post_delta, online_guess = info[who]
-  #if online_guess or True:  #info[who][2]: # online_guess
-  #  print('{:>3s} {} {}'.format(level[who], time_format(post_delta), who))
-  if online[who]:  #info[who][2]:
-    print('{:>3s} {} {}'.format(level[who], time_format(now_delta), who))
+for who in sorted(timeleft, key=lambda x:timeleft[x]):
+  if online[who]:
+    print('{:>3s} {} {}'.format(level[who], time_format(timeleft[who]), who))
 print("Quest: "+quest_info(quest_started, quest_time_left, quest_times))
