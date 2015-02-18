@@ -1,5 +1,14 @@
 #!/usr/bin/env python
 
+# Accuracy warnings:
+#   * Multi-people changes (realm wide penalties, quest completions, team
+#     battles) are not included in time updates
+#   * Non-printed penalties (e.g. when someone leaves) are not included,
+#     making offline folks always have a higher TTL than displayed
+#   * There are two types of offline -- definitely offline and assumed
+#     offline due to my logging stopping.  This can result in weird sort
+#     ordering.
+
 from datetime import datetime, timedelta
 import math
 import re
@@ -45,6 +54,9 @@ def handle_timeleft(m):
 
   timeleft[who] = now_delta
 
+def adjust_timeleft(who, post_epoch):
+  if who in timeleft and online[who]:
+    timeleft[who] += (now-post_epoch)
 
 with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
   for line in f:
@@ -94,17 +106,23 @@ with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
     #
 
     # Just a single user quitting
-    m = re.match(r'(?P<postdate>[\d-]{10} [\d:]{8}) *\t(?P<nick>.*) has (?:quit|left)', line)
+    m = re.match(r'(?P<postdate>[\d-]{10} [\d:]{8}) \*\s*(?P<nick>.*) has (?:quit|left)', line)
     if m:
       nick = m.group('nick')
+      post_epoch = convert_to_epoch(m.group('postdate'))
+      adjust_timeleft(player.get(nick), post_epoch)
       if nick in player:
         online[player[nick]] = False
       continue
 
     # I got disconnected somehow
-    m = re.match(r'\*\*\*\* BEGIN LOGGING', line)
+    m = re.match(r'\*\*\*\* ENDING LOGGING AT (.*)', line)
     if m:
+      enddate = m.group(1)
+      timetuple = datetime.strptime(enddate, '%a %b %d %H:%M:%S %Y').timetuple()
+      post_epoch = time.mktime(timetuple)
       for who in online:
+        adjust_timeleft(who, post_epoch)
         online[who] = None
       continue
 
@@ -153,7 +171,8 @@ with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
     # Y, the level W Z, is #U! Next level in...
     m = re.match(postdate_re+r"(?P<who>.*?), the level .*, is #\d+! "+nextlvl_re, line)
     if m:
-      handle_timeleft(m)
+      if online.get(m.group('who'), False):
+        handle_timeleft(m)
       continue
 
 def time_format(seconds):
@@ -185,10 +204,8 @@ def quest_info(started, time_left, quest_times):
   else:
     return "None"
 
-print "Warning: recent realm wide penalties and quest completions ignored\n"
-print "Lvl  Time-to-Lvl character"
-print "--- ------------ ---------"
-for who in sorted(timeleft, key=lambda x:timeleft[x]):
-  if online[who]:
-    print('{:>3s} {} {}'.format(level[who], time_format(timeleft[who]), who))
+print "Lvl On?  Time-to-Lvl character"
+print "--- --- ------------ ---------"
+for who in sorted(timeleft, key=lambda x:(online[x],timeleft[x])):
+  print('{:>3s} {:3s} {} {}'.format(level[who], 'yes' if online[who] else 'no', time_format(timeleft[who]), who))
 print("Quest: "+quest_info(quest_started, quest_time_left, quest_times))
