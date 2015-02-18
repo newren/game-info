@@ -6,8 +6,9 @@
 #   * Non-printed penalties (e.g. when someone leaves) are not included,
 #     making offline folks always have a higher TTL than displayed
 #   * There are two types of offline -- definitely offline and assumed
-#     offline due to my logging stopping.  This can result in weird sort
-#     ordering.
+#     offline due to my logging stopping (e.g. me getting disconnected
+#     due to computer rebooting).  This can result in weird sort ordering
+#     for the offline folks.
 
 from datetime import datetime, timedelta
 import math
@@ -223,3 +224,5 @@ print "--- --- ---- ------------ ---------"
 for who in sorted(timeleft, key=lambda x:(online[x],timeleft[x])):
   print('{:>3s} {:3s} {:4d} {} {}'.format(level[who], 'yes' if online[who] else 'no', itemsum[who], time_format(timeleft[who]), who))
 print("Quest: "+quest_info(quest_started, quest_time_left, quest_times))
+# If last quest ended successfully, next will be 6 hours later; if last quest
+# aborted due to penalized player, next will be 12 hours later.  Print that info?
