@@ -316,9 +316,14 @@ def expected_ttl_burn(who): # How much time-to-level will decrease in next day
 
   return ttl_burn
 
+brkln="--- --- ---- ------------ ------------ ---------"
 print "Lvl On? ISum  Time-to-Lvl ExpectedBurn character"
-print "--- --- ---- ------------ ------------ ---------"
+last = True
 for who in sorted(timeleft, key=lambda x:(online[x],timeleft[x])):
   on = 'yes' if online[who] else ('???' if online[who] is None else 'no')
+  assumed_on = bool(on=='yes')
+  if assumed_on ^ last:
+    print brkln
+    last = assumed_on
   print('{:3d} {:3s} {:4d} {} {} {}'.format(level[who], on, itemsum[who], time_format(timeleft[who]), time_format(expected_ttl_burn(who)), who))
 print("Quest: "+quest_info(quest_started, quest_time_left, quest_times))
