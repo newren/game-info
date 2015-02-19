@@ -21,10 +21,11 @@ def convert_to_epoch(timestring):
 def convert_to_duration(days, hours, mins, secs):
   return 86400*int(days) + 3600*int(hours) + 60*int(mins) + int(secs)
 
-level = {}    # who_string -> level_number
-online = {}   # who_string -> boolean (well, False or True or None=unknown)
-timeleft = {} # who_string -> seconds_left
-itemsum = {}  # who_string -> latest_battle_itemsum
+level = {}     # who_string -> level_number
+online = {}    # who_string -> boolean (well, False or True or None=unknown)
+timeleft = {}  # who_string -> seconds_left
+itemsum = {}   # who_string -> latest_battle_itemsum
+alignment = {} # who_string -> alignment
 player = {}  # ircnick -> who_string
 quest_started = None  # time_string or None
 quest_times = []
@@ -59,13 +60,17 @@ def adjust_timeleft(who, post_epoch):
   if who in timeleft and online[who]:
     timeleft[who] += (now-post_epoch)
 
+def adjust_timeleft_percentage(who, post_epoch, percentage):
+  if who in timeleft:
+    timeremaining = timeleft[who] + (now-post_epoch)
+    timeleft[who] = (1-percentage/100.0)*timeremaining - (now-post_epoch)
+
 def reward_questers(quest_end, wholist):
   questers = re.findall('[^, ]+', wholist)
   questers.remove('and')
   for who in questers:
     if who in timeleft:
-      timeremaining = timeleft[who] + (now-quest_end)
-      timeleft[who] = .75*timeremaining - (now-quest_end)
+      adjust_timeleft_percentage(who, quest_end, 25)
 
 with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
   for line in f:
@@ -130,6 +135,7 @@ with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
       who = m.group('who')
       level[who] = 0
       itemsum[who] = 0
+      alignment[who] = 'neut'
       online[who] = True
       player[m.group('nick')] = who
       handle_timeleft(m)
@@ -149,6 +155,8 @@ with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
     if m:
       who = m.group('who')
       level[who] = int(m.group('level'))
+      if who not in alignment:
+        alignment[who] = 'neut'
       handle_timeleft(m)
       continue
 
@@ -169,18 +177,6 @@ with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
       if online.get(m.group('who'), False):
         handle_timeleft(m)
       continue
-
-    # I, J, and K [.*] have team battled.* and (won|lost)!
-    m = re.match(postdate_re+r'(.*?)\[.*?have team battled .*? and (won|lost)! (\d+) days?, (\d{2}):(\d{2}):(\d{2})', line)
-    if m:
-      postdate, team, result, days, hours, mins, secs = m.groups()
-      members = re.findall('[^, ]+', team)
-      members.remove('and')
-      duration = convert_to_duration(days, hours, mins, secs)
-      sign = -1 if (result == 'won') else 1
-      for who in members:
-        if who in timeleft:
-          timeleft[who] += sign*duration
 
     #
     # Check for going offline
@@ -221,6 +217,52 @@ with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
       itemsum[attacker] = int(attacker_sum)
       itemsum[defender] = int(defender_sum)
       continue
+
+    #
+    # Check for alignment
+    #
+
+    # X has changed alignment to: \w+.
+    m = re.match(postdate_re+r"(?P<who>.*) has changed alignment to: (.*)\.$", line)
+    if m:
+      postdate, who, align = m.groups()
+      alignment[who] = align.replace('neutral', 'neut')
+      continue
+
+    #
+    # Various adjustments to timeleft
+    #
+
+    # X is forsaken by their evil god. \d+ days...
+    m = re.match(postdate_re+r'(.*?) is forsaken by their evil god. (\d+) days?, (\d{2}):(\d{2}):(\d{2})', line)
+    if m:
+      postdate, who, days, hours, mins, secs = m.groups()
+      duration = convert_to_duration(days, hours, mins, secs)
+      timeleft[who] += duration
+      alignment[who] = 'evil'
+
+    # X and Y have not let the iniquities of evil men.*them.  \d+% of their time
+    m = re.match(postdate_re+r'(.*?) and (.*?) have not let the iniquities of evil men.*them. (\d+)% of their time is removed from their clocks', line)
+    if m:
+      postdate, who1, who2, percentage = m.groups()
+      post_epoch = convert_to_epoch(postdate)
+      adjust_timeleft_percentage(who1, post_epoch, int(percentage))
+      adjust_timeleft_percentage(who2, post_epoch, int(percentage))
+      alignment[who1] = 'good'
+      alignment[who2] = 'good'
+
+    # I, J, and K [.*] have team battled.* and (won|lost)!
+    m = re.match(postdate_re+r'(.*?)\[.*?have team battled .*? and (won|lost)! (\d+) days?, (\d{2}):(\d{2}):(\d{2})', line)
+    if m:
+      postdate, team, result, days, hours, mins, secs = m.groups()
+      members = re.findall('[^, ]+', team)
+      members.remove('and')
+      duration = convert_to_duration(days, hours, mins, secs)
+      sign = -1 if (result == 'won') else 1
+      for who in members:
+        if who in timeleft:
+          timeleft[who] += sign*duration
+
 
 def time_format(seconds):
   sign = '-' if seconds<0 else ' '
@@ -295,6 +337,21 @@ def godsend_calamity_hog_burn(who):
   percent_hog      = .05*       (.05+.75)/2*(.8-.2)
   return (percent_godsend-percent_calamity+percent_hog) * (timeleft[who]-43200)
 
+def alignment_burn(who):
+  if alignment[who] == 'good':
+    good_and_online_count = sum([1 for x in online if online[x] and alignment[x] == 'good'])
+    if good_and_online_count < 2:
+      return 0
+    percent = (.05+.12)/2
+    odds = 2*(1.0/12)
+    return odds*percent*(timeleft[who]-43200)
+  elif alignment[who] == 'evil':
+    percent = (.01+.05)/2
+    odds = .5*1.0/8
+    return -odds*percent*(timeleft[who]-43200)
+  else:
+    return 0
+
 def expected_ttl_burn(who): # How much time-to-level will decrease in next day
   # If they're not online, their time-to-level isn't going to decrease at all
   if not online[who]:
@@ -312,12 +369,12 @@ def expected_ttl_burn(who): # How much time-to-level will decrease in next day
   ttl_burn = 86400
   ttl_burn += battle_burn(who)
   ttl_burn += godsend_calamity_hog_burn(who)
-  # FIXME: Really ought to handle alignment modifications too
+  ttl_burn += alignment_burn(who)
 
   return ttl_burn
 
-brkln="--- --- ---- ------------ ------------ ---------"
-print "Lvl On? ISum  Time-to-Lvl ExpectedBurn character"
+brkln="--- --- ---- ------------ ---- ------------ ---------"
+print "Lvl On? ISum  Time-to-Lvl Algn ExpectedBurn character"
 last = True
 for who in sorted(timeleft, key=lambda x:(online[x],timeleft[x])):
   on = 'yes' if online[who] else ('???' if online[who] is None else 'no')
@@ -325,5 +382,5 @@ for who in sorted(timeleft, key=lambda x:(online[x],timeleft[x])):
   if assumed_on ^ last:
     print brkln
     last = assumed_on
-  print('{:3d} {:3s} {:4d} {} {} {}'.format(level[who], on, itemsum[who], time_format(timeleft[who]), time_format(expected_ttl_burn(who)), who))
+  print('{:3d} {:3s} {:4d} {} {} {} {}'.format(level[who], on, itemsum[who], time_format(timeleft[who]), alignment[who], time_format(expected_ttl_burn(who)), who))
 print("Quest: "+quest_info(quest_started, quest_time_left, quest_times))
