@@ -1,14 +1,13 @@
 #!/usr/bin/env python
 
 # Accuracy warnings:
-#   * Multi-people changes (realm wide penalties, quest completions, team
-#     battles) are not included in time updates
-#   * Non-printed penalties (e.g. when someone leaves) are not included,
-#     making offline folks always have a higher TTL than displayed
+#   * Penalties other than quitting and realm wide penalties are not included
+#     (except parting, which is incorrectly treated like quitting), making
+#     folks sometimes have a higher TTL than displayed.
 #   * There are two types of offline -- definitely offline and assumed
 #     offline due to my logging stopping (e.g. me getting disconnected
 #     due to computer rebooting).  This can result in weird sort ordering
-#     for the offline folks.
+#     for the offline folks, not properly accounting for penalties, etc.
 
 from datetime import datetime, timedelta
 import math
@@ -60,6 +59,14 @@ def adjust_timeleft(who, post_epoch):
   if who in timeleft and online[who]:
     timeleft[who] += (now-post_epoch)
 
+def reward_questers(quest_end, wholist):
+  questers = re.findall('[^, ]+', wholist)
+  questers.remove('and')
+  for who in questers:
+    if who in timeleft:
+      timeremaining = timeleft[who] + (now-quest_end)
+      timeleft[who] = .75*timeremaining - (now-quest_end)
+
 with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
   for line in f:
     #
@@ -86,6 +93,9 @@ with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
       quest_time_left = None
       questers = None
       next_quest = convert_to_epoch(end)+43200
+      for p in online:
+        if online[p] and p in level:
+          timeleft[p] += 15*1.14**level[p]
       continue
     m = re.match(r"([\d-]{10} [\d:]{8}) <idlerpg>.*completed their journey", line)
     if m:
@@ -93,18 +103,21 @@ with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
       beg_epoch = convert_to_epoch(quest_started)
       end_epoch = convert_to_epoch(end)
       quest_times.append(end_epoch-beg_epoch)
+      reward_questers(end_epoch, questers)
       quest_started = None
       quest_time_left = None
       questers = None
-      next_quest = convert_to_epoch(end)+21600
+      next_quest = end_epoch+21600
       continue
     m = re.match(r"([\d-]{10} [\d:]{8}) <idlerpg>.*have blessed the realm by completing their quest", line)
     if m:
       end = m.group(1)
+      end_epoch = convert_to_epoch(end)
+      reward_questers(end_epoch, questers)
       quest_started = None
       quest_time_left = None
       questers = None
-      next_quest = convert_to_epoch(end)+21600
+      next_quest = end_epoch+21600
       continue
 
     #
@@ -157,6 +170,18 @@ with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
         handle_timeleft(m)
       continue
 
+    # I, J, and K [.*] have team battled.* and (won|lost)!
+    m = re.match(postdate_re+r'(.*?)\[.*?have team battled .*? and (won|lost)! (\d+) days?, (\d{2}):(\d{2}):(\d{2})', line)
+    if m:
+      postdate, team, result, days, hours, mins, secs = m.groups()
+      members = re.findall('[^, ]+', team)
+      members.remove('and')
+      duration = convert_to_duration(days, hours, mins, secs)
+      sign = -1 if (result == 'won') else 1
+      for who in members:
+        if who in timeleft:
+          timeleft[who] += sign*duration
+
     #
     # Check for going offline
     #
@@ -166,9 +191,12 @@ with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
     if m:
       nick = m.group('nick')
       post_epoch = convert_to_epoch(m.group('postdate'))
-      adjust_timeleft(player.get(nick), post_epoch)
-      if nick in player:
-        online[player[nick]] = False
+      who = player.get(nick)
+      if who:
+        adjust_timeleft(who, post_epoch)
+        if who in timeleft and online[who]:
+          timeleft[who] += 20*1.14**level[who]
+        online[who] = False
       continue
 
     # I got disconnected somehow
