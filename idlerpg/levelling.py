@@ -210,7 +210,7 @@ def quest_info(started, time_left, quest_times):
   if started:
     if time_left: # Time-based quest
       return "Will end in "+time_format(time_left)+\
-             "Participants: "+questers
+             "; Participants: "+questers
     else:
       import numpy
       beg_epoch = convert_to_epoch(started)
