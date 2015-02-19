@@ -111,7 +111,7 @@ with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
     m = re.match(postdate_re+r"Welcome (?P<nick>.*)'s new player (?P<who>.*), the .*! "+nextlvl_re, line)
     if m:
       who = m.group('who')
-      level[who] = '0'
+      level[who] = 0
       itemsum[who] = 0
       online[who] = True
       player[m.group('nick')] = who
@@ -131,7 +131,7 @@ with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
     m = re.match(postdate_re+r"(?P<who>.*), the .*, has attained level (?P<level>\d+)! "+nextlvl_re, line)
     if m:
       who = m.group('who')
-      level[who] = m.group('level')
+      level[who] = int(m.group('level'))
       handle_timeleft(m)
       continue
 
@@ -219,10 +219,75 @@ def quest_info(started, time_left, quest_times):
   else:
     return "None"
 
-print "Lvl On? ISum  Time-to-Lvl character"
-print "--- --- ---- ------------ ---------"
+def battle_burn(who):
+  # FIXME: Really ought to handle being hit by critical strikes from others too
+  oncount = sum([1 for x in online if online[x]])
+  odds_fight_per_day = 24.0/oncount  # every hour, 1.0 selected to start fight
+  odds_fight_per_day += 1.5/oncount  # 1.5ish grid battles per day
+  # team battles are basically a wash; the reward is equal to the loss, so the
+  # only probabilistic difference is if your itemsum is higher or lower than
+  # average making you more or less likely than 50% to win.
+  percent_change = 0
+  # Technically, grid battles cannot be against the 'idlerpg' user, which
+  # means I should adjust odds_fight_per_day and odds_fight_this_opp to be
+  # more precise, but meh -- it won't change things that much.
+  for opp in online:
+    if opp == who or not online[opp]:
+      continue
+    gain = max(7,level[opp]/4)
+    loss = max(7,level[opp]/7)
+    odds_fight_this_opp = 1.0/oncount # oncount-1 other players, plus idlerpg
+    odds_beat_opp = itemsum[who]/(itemsum[who]+itemsum[opp]+0.0)
+
+    change_if_fight = odds_beat_opp*gain - (1-odds_beat_opp)*loss
+    diff = change_if_fight*odds_fight_this_opp*odds_fight_per_day
+    percent_change += diff
+  if True: # Also handle idlerpg
+    gain = 20
+    loss = 10
+    odds_fight_this_opp = 1.0/oncount # oncount-1 other players, plus idlerpg
+    odds_beat_opp = itemsum[who]/(itemsum[who]+itemsum['idlerpg']+0.0)
+
+    change_if_fight = odds_beat_opp*gain - (1-odds_beat_opp)*loss
+    diff = change_if_fight*odds_fight_this_opp*odds_fight_per_day
+    percent_change += diff
+  return percent_change/100.0 * (timeleft[who]-43200)
+
+def godsend_calamity_hog_burn(who):
+  # 1/8 chance per day (per online user) of calamity
+  # 1/4 chance per day (per online user) of godsend
+  # 9/10 chance per day calamity or godsend will change ttl by 5-12%
+  # 1/20 chance per day (per online user) of hog; which change ttl by 5-75%; 20% chance bad and 80% good
+  percent_calamity = .9*(1.0/8)*(.05+.12)/2
+  percent_godsend  = .9*(1.0/4)*(.05+.12)/2
+  percent_hog      = .05*       (.05+.75)/2*(.8-.2)
+  return (percent_godsend-percent_calamity+percent_hog) * (timeleft[who]-43200)
+
+def expected_ttl_burn(who): # How much time-to-level will decrease in next day
+  # If they're not online, their time-to-level isn't going to decrease at all
+  if not online[who]:
+    return 0
+
+  # If user has less than a day left, the fact that we tend to burn faster more
+  # than a day's worth of time-to-level per day becomes a bit weird.  The
+  # correct amount to report will depend upon what their ttl becomes after they
+  # go to the next level.  For now, just pretend they'll burn at a flat rate
+  # if they have less than half a day left
+  if timeleft[who] < 43200:
+    return 86400
+
+  # By default, if people wait a day, a day of time-to-level burns
+  ttl_burn = 86400
+  ttl_burn += battle_burn(who)
+  ttl_burn += godsend_calamity_hog_burn(who)
+  # FIXME: Really ought to handle alignment modifications too
+
+  return ttl_burn
+
+print "Lvl On? ISum  Time-to-Lvl ExpectedBurn character"
+print "--- --- ---- ------------ ------------ ---------"
 for who in sorted(timeleft, key=lambda x:(online[x],timeleft[x])):
-  print('{:>3s} {:3s} {:4d} {} {}'.format(level[who], 'yes' if online[who] else 'no', itemsum[who], time_format(timeleft[who]), who))
+  print('{:3d} {:3s} {:4d} {} {} {}'.format(level[who], 'yes' if online[who] else 'no', itemsum[who], time_format(timeleft[who]), time_format(expected_ttl_burn(who)), who))
 print("Quest: "+quest_info(quest_started, quest_time_left, quest_times))
 # If last quest ended successfully, next will be 6 hours later; if last quest
 # aborted due to penalized player, next will be 12 hours later.  Print that info?
