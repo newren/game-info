@@ -81,9 +81,11 @@ with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
     #
     m = re.match(r"([\d-]{10} [\d:]{8}) <idlerpg>.*prudence and self-regard has brought the wrath of the gods upon the realm", line)
     if m:
+      end = m.group(1)
       quest_started = None
       quest_time_left = None
       questers = None
+      next_quest = convert_to_epoch(end)+43200
       continue
     m = re.match(r"([\d-]{10} [\d:]{8}) <idlerpg>.*completed their journey", line)
     if m:
@@ -94,6 +96,7 @@ with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
       quest_started = None
       quest_time_left = None
       questers = None
+      next_quest = convert_to_epoch(end)+21600
       continue
     m = re.match(r"([\d-]{10} [\d:]{8}) <idlerpg>.*have blessed the realm by completing their quest", line)
     if m:
@@ -101,6 +104,7 @@ with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
       quest_started = None
       quest_time_left = None
       questers = None
+      next_quest = convert_to_epoch(end)+21600
       continue
 
     #
@@ -217,7 +221,7 @@ def quest_info(started, time_left, quest_times):
       return "May end in {}; most likely to end in {}".format(early, likely)+\
              "\nParticipants: "+questers
   else:
-    return "None"
+    return "None; next should start in {}".format(time_format(next_quest-now))
 
 def battle_burn(who):
   # FIXME: Really ought to handle being hit by critical strikes from others too
@@ -289,5 +293,3 @@ print "--- --- ---- ------------ ------------ ---------"
 for who in sorted(timeleft, key=lambda x:(online[x],timeleft[x])):
   print('{:3d} {:3s} {:4d} {} {} {}'.format(level[who], 'yes' if online[who] else 'no', itemsum[who], time_format(timeleft[who]), time_format(expected_ttl_burn(who)), who))
 print("Quest: "+quest_info(quest_started, quest_time_left, quest_times))
-# If last quest ended successfully, next will be 6 hours later; if last quest
-# aborted due to penalized player, next will be 12 hours later.  Print that info?
