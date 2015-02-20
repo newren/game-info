@@ -4,10 +4,10 @@
 #   * Penalties other than quitting and realm wide penalties are not included
 #     (except parting, which is incorrectly treated like quitting), making
 #     folks sometimes have a higher TTL than displayed.
-#   * There are two types of offline -- definitely offline and assumed
-#     offline due to my logging stopping (e.g. me getting disconnected
-#     due to computer rebooting).  This can result in weird sort ordering
-#     for the offline folks, not properly accounting for penalties, etc.
+#   * When logging stops, I don't know what has happened in the interim,
+#     which makes it hard to guess the correct data; I can only tell what the
+#     correct data is once logging restarts and messages about each user
+#     come in giving me updated information.
 
 from datetime import datetime, timedelta
 import math
@@ -30,6 +30,7 @@ player = {}  # ircnick -> who_string
 quest_started = None  # time_string or None
 quest_times = []
 now = time.time()
+final_log_break = 0
 
 postdate_re="(?P<postdate>[\d-]{10} [\d:]{8}) <idlerpg>\t"
 nextlvl_re="[Nn]ext level in (?P<days>\d+) days?, (?P<hours>\d{2}):(?P<mins>\d{2}):(?P<secs>\d{2})"
@@ -201,6 +202,7 @@ with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
       enddate = m.group(1)
       timetuple = datetime.strptime(enddate, '%a %b %d %H:%M:%S %Y').timetuple()
       post_epoch = time.mktime(timetuple)
+      final_log_break = post_epoch
       for who in online:
         adjust_timeleft(who, post_epoch)
         online[who] = None
@@ -373,6 +375,13 @@ def expected_ttl_burn(who): # How much time-to-level will decrease in next day
 
   return ttl_burn
 
+# Mark people as offline if they're unknown but their ttl suggests they
+# should have already levelled by now
+for who in online:
+  if online[who] is None and timeleft[who]+final_log_break < now:
+    online[who] = False
+
+# Print out all the information we've collected
 brkln="--- --- ---- ------------ ---- ------------ ---------"
 print "Lvl On? ISum  Time-to-Lvl Algn ExpectedBurn character"
 last = True
