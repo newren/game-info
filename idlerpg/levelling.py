@@ -62,9 +62,13 @@ def adjust_timeleft_percentage(who, post_epoch, percentage):
   time_then_remaining = stats[who]['timeleft'] + then_diff
   stats[who]['timeleft'] = (1-percentage/100.0)*time_then_remaining - then_diff
 
+def get_people_list(wholist):
+  people = re.findall('[^, ]+', wholist)
+  people.remove('and')
+  return people
+
 def reward_questers(quest_end, wholist):
-  questers = re.findall('[^, ]+', wholist)
-  questers.remove('and')
+  questers = get_people_list(wholist)
   for who in questers:
     adjust_timeleft_percentage(who, quest_end, 25)
 
@@ -76,12 +80,16 @@ with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
     m = re.match(r"([\d-]{10} [\d:]{8}) <idlerpg>\s*(.*) have been chosen.*Participants must first reach", line)
     if m:
       quest_started, questers = m.groups()
+      for who in get_people_list(questers):
+        stats[who]['online'] = True
       continue
     m = re.match(r"([\d-]{10} [\d:]{8}) <idlerpg>\s*(.*) have been chosen.*Quest to end in (\d+) days?, (\d{2}):(\d{2}):(\d{2})", line)
     if m:
       quest_started, questers, days, hours, mins, secs = m.groups()
       duration = convert_to_duration(days, hours, mins, secs)
       quest_time_left = convert_to_epoch(quest_started)+duration-now
+      for who in get_people_list(questers):
+        stats[who]['online'] = True
       continue
 
     #
@@ -209,8 +217,10 @@ with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
       postdate, attacker, attacker_sum, defender, defender_sum = m.groups()
       if attacker != 'idlerpg':
         stats[attacker]['itemsum'] = int(attacker_sum)
+        stats[attacker]['online'] = True
       if defender != 'idlerpg':
         stats[defender]['itemsum'] = int(defender_sum)
+        stats[defender]['online'] = True
       continue
 
     #
