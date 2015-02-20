@@ -359,6 +359,19 @@ def alignment_burn(who):
   else:
     return 0
 
+def quest_burn(who):
+  above_level_40 = sum([1 for x in stats
+                        if stats[x]['online'] and stats[x]['level'] >= 40])
+  if above_level_40 < 4:
+    return 0
+  location_quest_average = sum(quest_times)/len(quest_times)
+  time_quest_average = 86400*1.5
+  average_quest_time = (location_quest_average+time_quest_average)/2
+  average_wait_time = 21600 # Assumes quests end successfully
+  quests_per_day = 86400 / (average_quest_time + average_wait_time)
+  odds_quest = 4.0/above_level_40
+  return odds_quest * quests_per_day * .25 * stats[who]['timeleft']
+
 def expected_ttl_burn(who): # How much time-to-level will decrease in next day
   # If they're not online, their time-to-level isn't going to decrease at all
   if not stats[who]['online']:
@@ -371,6 +384,13 @@ def expected_ttl_burn(who): # How much time-to-level will decrease in next day
   # if they have less than half a day left
   if stats[who]['timeleft'] < 43200:
     return 86400
+
+  # Print out ttl burn info
+  #bb = battle_burn(who)
+  #gchb = godsend_calamity_hog_burn(who)
+  #ab = alignment_burn(who)
+  #qb = quest_burn(who)
+  #print '     {}'.format((who,bb,gchb,ab,qb,time_format(86400+bb+gchb+ab+qb)))
 
   # By default, if people wait a day, a day of time-to-level burns
   ttl_burn = 86400
