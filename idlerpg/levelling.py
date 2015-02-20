@@ -23,15 +23,14 @@ def convert_to_duration(days, hours, mins, secs):
   return 86400*int(days) + 3600*int(hours) + 60*int(mins) + int(secs)
 
 def default_player():
-  return {'level':0, 'online':None, 'timeleft':0, 'itemsum':0,
-          'alignment':'neutral'}
+  return {'level':0, 'timeleft':0, 'itemsum':0, 'alignment':'neutral',
+          'online':None, 'last_logbreak_seen':0}
 
 stats = defaultdict(default_player)
 player = {}  # ircnick -> who_string
 quest_started = None  # time_string or None
 quest_times = []
 now = time.time()
-final_log_break = 0
 
 postdate_re="(?P<postdate>[\d-]{10} [\d:]{8}) <idlerpg>\t"
 nextlvl_re="[Nn]ext level in (?P<days>\d+) days?, (?P<hours>\d{2}):(?P<mins>\d{2}):(?P<secs>\d{2})"
@@ -53,7 +52,7 @@ def handle_timeleft(m):
 
   stats[who]['timeleft'] = now_delta
 
-def adjust_timeleft(who, post_epoch):
+def stop_timeleft_as_of(who, post_epoch):
   if stats[who]['online']:
     stats[who]['timeleft'] += (now-post_epoch)
 
@@ -189,7 +188,7 @@ with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
       post_epoch = convert_to_epoch(m.group('postdate'))
       who = player.get(nick)
       if who in stats:
-        adjust_timeleft(who, post_epoch)
+        stop_timeleft_as_of(who, post_epoch)
         if stats[who]['online']:
           stats[who]['timeleft'] += 20*1.14**stats[who]['level']
         stats[who]['online'] = False
@@ -201,9 +200,10 @@ with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
       enddate = m.group(1)
       timetuple = datetime.strptime(enddate, '%a %b %d %H:%M:%S %Y').timetuple()
       post_epoch = time.mktime(timetuple)
-      final_log_break = post_epoch
       for who in stats:
-        adjust_timeleft(who, post_epoch)
+        stop_timeleft_as_of(who, post_epoch)
+        if stats[who]['online'] != None:
+          stats[who]['last_logbreak_seen'] = post_epoch
         stats[who]['online'] = None
       continue
 
@@ -384,7 +384,7 @@ def expected_ttl_burn(who): # How much time-to-level will decrease in next day
 # should have already levelled by now
 for who in stats:
   if stats[who]['online'] is None and \
-     stats[who]['timeleft']+final_log_break < now:
+     stats[who]['timeleft']+stats[who]['last_logbreak_seen'] < now:
     stats[who]['online'] = False
 
 # Print out all the information we've collected
