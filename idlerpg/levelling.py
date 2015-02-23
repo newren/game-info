@@ -11,10 +11,22 @@
 
 from datetime import datetime, timedelta
 from collections import defaultdict
+import argparse
 import math
 import re
 import subprocess
 import time
+
+now = time.time()
+
+def parse_args():
+  global now
+  parser = argparse.ArgumentParser(description='Frobnicate the unobtanium')
+  parser.add_argument('--until', type=str,
+                      help='Get state of channel until this specified time (default: now)')
+  args = parser.parse_args()
+  if args.until:
+    now = convert_to_epoch(args.until)
 
 def convert_to_epoch(timestring):
   timetuple = datetime.strptime(timestring, '%Y-%m-%d %H:%M:%S').timetuple()
@@ -26,247 +38,284 @@ def default_player():
   return {'level':0, 'timeleft':0, 'itemsum':0, 'alignment':'neutral',
           'online':None, 'last_logbreak_seen':0}
 
-stats = defaultdict(default_player)
-player = {}  # ircnick -> who_string
-quest_started = None  # time_string or None
-quest_times = []
-now = time.time()
-
+parse_args()
 postdate_re="(?P<postdate>[\d-]{10} [\d:]{8}) <idlerpg>\t"
 nextlvl_re="[Nn]ext level in (?P<days>\d+) days?, (?P<hours>\d{2}):(?P<mins>\d{2}):(?P<secs>\d{2})"
 
-def handle_timeleft(m):
-  postdate = m.group('postdate')
-  who = m.group('who')
-  days = m.group('days')
-  hours = m.group('hours')
-  mins = m.group('mins')
-  secs = m.group('secs')
+class IdlerpgStats(defaultdict):
+  def __init__(self):
+    super(IdlerpgStats, self).__init__(default_player)
+    self.player = {}  # ircnick -> who_string
+    self.quest_started = None  # time_string or None
+    self.quest_times = []
+    self.quest_started = None
+    self.quest_time_left = None
+    self.questers = None
+    self.next_quest = 0
+    self.last_line = None
 
-  # Given that we were told the time to the next level and know when we
-  # were told that, determine how much time currently remains until that
-  # character reaches the next level
-  post_epoch = convert_to_epoch(postdate)
-  post_delta = convert_to_duration(days, hours, mins, secs)
-  now_delta = (post_epoch+post_delta)-now
+  def handle_timeleft(self, m, epoch):
+    who = m.group('who')
+    days = m.group('days')
+    hours = m.group('hours')
+    mins = m.group('mins')
+    secs = m.group('secs')
 
-  stats[who]['timeleft'] = now_delta
+    # Given that we were told the time to the next level and know when we
+    # were told that, determine how much time currently remains until that
+    # character reaches the next level
+    post_delta = convert_to_duration(days, hours, mins, secs)
+    now_delta = (epoch+post_delta)-now
 
-def stop_timeleft_as_of(who, post_epoch):
-  if stats[who]['online']:
-    stats[who]['timeleft'] += (now-post_epoch)
+    self[who]['timeleft'] = now_delta
 
-def adjust_timeleft_percentage(who, post_epoch, percentage):
-  then_diff = (now-post_epoch)
-  time_then_remaining = stats[who]['timeleft'] + then_diff
-  stats[who]['timeleft'] = (1-percentage/100.0)*time_then_remaining - then_diff
+  def stop_timeleft_as_of(self, who, post_epoch):
+    if self[who]['online']:
+      self[who]['timeleft'] += (now-post_epoch)
 
-def get_people_list(wholist):
-  people = re.findall('[^, ]+', wholist)
-  people.remove('and')
-  return people
+  def adjust_timeleft_percentage(self, who, post_epoch, percentage):
+    then_diff = (now-post_epoch)
+    time_then_remaining = self[who]['timeleft'] + then_diff
+    self[who]['timeleft'] = (1-percentage/100.0)*time_then_remaining - then_diff
 
-def reward_questers(quest_end, wholist):
-  questers = get_people_list(wholist)
-  for who in questers:
-    adjust_timeleft_percentage(who, quest_end, 25)
+  @staticmethod
+  def get_people_list(wholist):
+    people = re.findall('[^, ]+', wholist)
+    people.remove('and')
+    return people
 
-with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
-  for line in f:
-    #
-    # Check for quest starting
-    #
-    m = re.match(r"([\d-]{10} [\d:]{8}) <idlerpg>\s*(.*) have been chosen.*Participants must first reach", line)
-    if m:
-      quest_started, questers = m.groups()
-      for who in get_people_list(questers):
-        stats[who]['online'] = True
-      continue
-    m = re.match(r"([\d-]{10} [\d:]{8}) <idlerpg>\s*(.*) have been chosen.*Quest to end in (\d+) days?, (\d{2}):(\d{2}):(\d{2})", line)
-    if m:
-      quest_started, questers, days, hours, mins, secs = m.groups()
-      duration = convert_to_duration(days, hours, mins, secs)
-      quest_time_left = convert_to_epoch(quest_started)+duration-now
-      for who in get_people_list(questers):
-        stats[who]['online'] = True
-      continue
+  def reward_questers(self, quest_end, questers_string):
+    for who in IdlerpgStats.get_people_list(questers_string):
+      self.adjust_timeleft_percentage(who, quest_end, 25)
 
-    #
-    # Check for quest ending
-    #
-    m = re.match(r"([\d-]{10} [\d:]{8}) <idlerpg>.*prudence and self-regard has brought the wrath of the gods upon the realm", line)
-    if m:
-      end = m.group(1)
-      quest_started = None
-      quest_time_left = None
-      questers = None
-      next_quest = convert_to_epoch(end)+43200
-      for p in stats:
-        if stats[p]['online']:
-          stats[p]['timeleft'] += 15*1.14**stats[p]['level']
-      continue
-    m = re.match(r"([\d-]{10} [\d:]{8}) <idlerpg>.*completed their journey", line)
-    if m:
-      end = m.group(1)
-      beg_epoch = convert_to_epoch(quest_started)
-      end_epoch = convert_to_epoch(end)
-      quest_times.append(end_epoch-beg_epoch)
-      reward_questers(end_epoch, questers)
-      quest_started = None
-      quest_time_left = None
-      questers = None
-      next_quest = end_epoch+21600
-      continue
-    m = re.match(r"([\d-]{10} [\d:]{8}) <idlerpg>.*have blessed the realm by completing their quest", line)
-    if m:
-      end = m.group(1)
-      end_epoch = convert_to_epoch(end)
-      reward_questers(end_epoch, questers)
-      quest_started = None
-      quest_time_left = None
-      questers = None
-      next_quest = end_epoch+21600
-      continue
+  def next_lines(self, f):
+    if self.last_line:
+      yield self.last_line
+    for line in f:
+      self.last_line = line
+      yield line
 
-    #
-    # Various checks for time-to-next-level
-    #
+  def parse_lines(self, f):
+    for line in self.next_lines(f):
+      #
+      # Check for going offline
+      #
 
-    # Welcome X's new player Y, the Z! Next level in...
-    m = re.match(postdate_re+r"Welcome (?P<nick>.*)'s new player (?P<who>.*), the .*! "+nextlvl_re, line)
-    if m:
-      who = m.group('who')
-      player[m.group('nick')] = who
-      # Defaults for level, itemsum, alignment are fine
-      stats[who]['online'] = True
-      handle_timeleft(m)
-      continue
+      # Just a single user quitting
+      m = re.match(r'(?P<postdate>[\d-]{10} [\d:]{8}) \*\s*(?P<nick>.*) has (?:quit|left)', line)
+      if m:
+        nick = m.group('nick')
+        post_epoch = convert_to_epoch(m.group('postdate'))
+        if post_epoch > now:
+          break
+        who = self.player.get(nick)
+        if who in self:
+          self.stop_timeleft_as_of(who, post_epoch)
+          if self[who]['online']:
+            self[who]['timeleft'] += 20*1.14**self[who]['level']
+          self[who]['online'] = False
+        continue
 
-    # Y, the level W Z, is now online from nickname X. Next level in...
-    m = re.match(postdate_re+r"(?P<who>.*), the level .*, is now online from nickname (?P<nick>.*). "+nextlvl_re, line)
-    if m:
-      who = m.group('who')
-      player[m.group('nick')] = who
-      stats[who]['online'] = True
-      handle_timeleft(m)
-      continue
+      # I got disconnected somehow
+      m = re.match(r'\*\*\*\* ENDING LOGGING AT (.*)', line)
+      if m:
+        enddate = m.group(1)
+        timetuple = datetime.strptime(enddate, '%a %b %d %H:%M:%S %Y').timetuple()
+        post_epoch = time.mktime(timetuple)
+        if post_epoch > now:
+          break
+        for who in self:
+          self.stop_timeleft_as_of(who, post_epoch)
+          if self[who]['online'] != None:
+            self[who]['last_logbreak_seen'] = post_epoch
+          self[who]['online'] = None
+        continue
 
-    # Y, the Z, has attained level W! Next level in...
-    m = re.match(postdate_re+r"(?P<who>.*), the .*, has attained level (?P<level>\d+)! "+nextlvl_re, line)
-    if m:
-      who = m.group('who')
-      stats[who]['level'] = int(m.group('level'))
-      handle_timeleft(m)
-      continue
+      #
+      # ALL CASES: Get the time of the post, and the remainder of the line
+      #
+      m = re.match(postdate_re+"(.*)$", line)
+      if not m:
+        continue
+      postdate, line = m.groups()
+      epoch = convert_to_epoch(postdate)
+      if epoch > now:
+        break
 
-    # Y reaches next level in...
-    #   Note: This is by far the most common message.  It is sent immediately
-    #   after hourly battles, immediately after grid-collision battles, after
-    #   immediately after godsends and calamaties, and immediately after a few
-    #   other cases like Critical Strikes or light of their God or hand of God.
-    m = re.match(postdate_re+r"(?P<who>.*) reaches "+nextlvl_re, line)
-    if m:
-      stats[m.group('who')]['online'] = True
-      handle_timeleft(m)
-      continue
+      #
+      # Check for quest starting
+      #
+      m = re.match("(.*) have been chosen.*Participants must first reach", line)
+      if m:
+        self.questers = m.group(1)
+        self.quest_started = epoch
+        for who in IdlerpgStats.get_people_list(self.questers):
+          self[who]['online'] = True
+        continue
+      m = re.match(r"(.*) have been chosen.*Quest to end in (\d+) days?, (\d{2}):(\d{2}):(\d{2})", line)
+      if m:
+        self.questers, days, hours, mins, secs = m.groups()
+        self.quest_started = epoch
+        duration = convert_to_duration(days, hours, mins, secs)
+        self.quest_time_left = self.quest_started+duration-now
+        for who in IdlerpgStats.get_people_list(self.questers):
+          self[who]['online'] = True
+        continue
 
-    # Y, the level W Z, is #U! Next level in...
-    m = re.match(postdate_re+r"(?P<who>.*?), the level .*, is #\d+! "+nextlvl_re, line)
-    if m:
-      if stats[m.group('who')]['online']:
-        handle_timeleft(m)
-      continue
+      #
+      # Check for quest ending
+      #
+      m = re.match(r".*prudence and self-regard has brought the wrath of the gods upon the realm", line)
+      if m:
+        self.quest_started = None
+        self.quest_time_left = None
+        self.questers = None
+        self.next_quest = epoch+43200
+        for p in self:
+          if self[p]['online']:
+            self[p]['timeleft'] += 15*1.14**self[p]['level']
+        continue
+      m = re.match(r".*completed their journey", line)
+      if m:
+        self.quest_times.append(epoch-self.quest_started)
+        self.reward_questers(epoch, self.questers)
+        self.quest_started = None
+        self.quest_time_left = None
+        self.questers = None
+        self.next_quest = epoch+21600
+        continue
+      m = re.match(r".*have blessed the realm by completing their quest", line)
+      if m:
+        self.reward_questers(epoch, self.questers)
+        self.quest_started = None
+        self.quest_time_left = None
+        self.questers = None
+        self.next_quest = epoch+21600
+        continue
 
-    #
-    # Check for going offline
-    #
+      #
+      # Various checks for time-to-next-level
+      #
 
-    # Just a single user quitting
-    m = re.match(r'(?P<postdate>[\d-]{10} [\d:]{8}) \*\s*(?P<nick>.*) has (?:quit|left)', line)
-    if m:
-      nick = m.group('nick')
-      post_epoch = convert_to_epoch(m.group('postdate'))
-      who = player.get(nick)
-      if who in stats:
-        stop_timeleft_as_of(who, post_epoch)
-        if stats[who]['online']:
-          stats[who]['timeleft'] += 20*1.14**stats[who]['level']
-        stats[who]['online'] = False
-      continue
+      # Welcome X's new player Y, the Z! Next level in...
+      m = re.match(r"Welcome (?P<nick>.*)'s new player (?P<who>.*), the .*! "+nextlvl_re, line)
+      if m:
+        self.handle_timeleft(m, epoch)
+        who = m.group('who')
+        self.player[m.group('nick')] = who
+        # Defaults for level, itemsum, alignment are fine
+        self[who]['online'] = True
+        continue
 
-    # I got disconnected somehow
-    m = re.match(r'\*\*\*\* ENDING LOGGING AT (.*)', line)
-    if m:
-      enddate = m.group(1)
-      timetuple = datetime.strptime(enddate, '%a %b %d %H:%M:%S %Y').timetuple()
-      post_epoch = time.mktime(timetuple)
-      for who in stats:
-        stop_timeleft_as_of(who, post_epoch)
-        if stats[who]['online'] != None:
-          stats[who]['last_logbreak_seen'] = post_epoch
-        stats[who]['online'] = None
-      continue
+      # Y, the level W Z, is now online from nickname X. Next level in...
+      m = re.match(r"(?P<who>.*), the level .*, is now online from nickname (?P<nick>.*). "+nextlvl_re, line)
+      if m:
+        who = m.group('who')
+        self.player[m.group('nick')] = who
+        self[who]['online'] = True
+        self.handle_timeleft(m, epoch)
+        continue
 
-    #
-    # Check for itemsums
-    #
+      # Y, the Z, has attained level W! Next level in...
+      m = re.match(r"(?P<who>.*), the .*, has attained level (?P<level>\d+)! "+nextlvl_re, line)
+      if m:
+        who = m.group('who')
+        self[who]['level'] = int(m.group('level'))
+        self.handle_timeleft(m, epoch)
+        continue
 
-    # Just a single user quitting
-    m = re.match(postdate_re+r"(?P<attacker>.*) \[\d+/(?P<attacker_sum>\d+)\] has (?:challenged|come upon) (?P<defender>.*) \[\d+/(?P<defender_sum>\d+)\]", line)
-    if m:
-      postdate, attacker, attacker_sum, defender, defender_sum = m.groups()
-      if attacker != 'idlerpg':
-        stats[attacker]['itemsum'] = int(attacker_sum)
-        stats[attacker]['online'] = True
-      if defender != 'idlerpg':
-        stats[defender]['itemsum'] = int(defender_sum)
-        stats[defender]['online'] = True
-      continue
+      # Y reaches next level in...
+      #   Note: This is by far the most common message.  It is sent immediately
+      #   after hourly battles, immediately after grid-collision battles, after
+      #   immediately after godsends and calamaties, and immediately after a few
+      #   other cases like Critical Strikes or light of their God or hand of God.
+      m = re.match(r"(?P<who>.*) reaches "+nextlvl_re, line)
+      if m:
+        self[m.group('who')]['online'] = True
+        self.handle_timeleft(m, epoch)
+        continue
 
-    #
-    # Check for alignment
-    #
+      # Y, the level W Z, is #U! Next level in...
+      m = re.match(r"(?P<who>.*?), the level .*, is #\d+! "+nextlvl_re, line)
+      if m:
+        if self[m.group('who')]['online']:
+          self.handle_timeleft(m, epoch)
+        continue
 
-    # X has changed alignment to: \w+.
-    m = re.match(postdate_re+r"(?P<who>.*) has changed alignment to: (.*)\.$", line)
-    if m:
-      postdate, who, align = m.groups()
-      stats[who]['alignment'] = align
-      continue
+      #
+      # Check for itemsums
+      #
 
-    #
-    # Various adjustments to timeleft
-    #
+      # Just a single user quitting
+      m = re.match(r"(?P<attacker>.*) \[\d+/(?P<attacker_sum>\d+)\] has (?:challenged|come upon) (?P<defender>.*) \[\d+/(?P<defender_sum>\d+)\]", line)
+      if m:
+        attacker, attacker_sum, defender, defender_sum = m.groups()
+        if attacker != 'idlerpg':
+          self[attacker]['itemsum'] = int(attacker_sum)
+          self[attacker]['online'] = True
+        if defender != 'idlerpg':
+          self[defender]['itemsum'] = int(defender_sum)
+          self[defender]['online'] = True
+        continue
 
-    # X is forsaken by their evil god. \d+ days...
-    m = re.match(postdate_re+r'(.*?) is forsaken by their evil god. (\d+) days?, (\d{2}):(\d{2}):(\d{2})', line)
-    if m:
-      postdate, who, days, hours, mins, secs = m.groups()
-      duration = convert_to_duration(days, hours, mins, secs)
-      stats[who]['timeleft'] += duration
-      stats[who]['alignment'] = 'evil'
+      #
+      # Check for alignment
+      #
 
-    # X and Y have not let the iniquities of evil men.*them.  \d+% of their time
-    m = re.match(postdate_re+r'(.*?) and (.*?) have not let the iniquities of evil men.*them. (\d+)% of their time is removed from their clocks', line)
-    if m:
-      postdate, who1, who2, percentage = m.groups()
-      post_epoch = convert_to_epoch(postdate)
-      adjust_timeleft_percentage(who1, post_epoch, int(percentage))
-      adjust_timeleft_percentage(who2, post_epoch, int(percentage))
-      stats[who1]['alignment'] = 'good'
-      stats[who2]['alignment'] = 'good'
+      # X has changed alignment to: \w+.
+      m = re.match(r"(?P<who>.*) has changed alignment to: (.*)\.$", line)
+      if m:
+        who, align = m.groups()
+        self[who]['alignment'] = align
+        continue
 
-    # I, J, and K [.*] have team battled.* and (won|lost)!
-    m = re.match(postdate_re+r'(.*?)\[.*?have team battled .*? and (won|lost)! (\d+) days?, (\d{2}):(\d{2}):(\d{2})', line)
-    if m:
-      postdate, team, result, days, hours, mins, secs = m.groups()
-      members = re.findall('[^, ]+', team)
-      members.remove('and')
-      duration = convert_to_duration(days, hours, mins, secs)
-      sign = -1 if (result == 'won') else 1
-      for who in members:
-        stats[who]['timeleft'] += sign*duration
+      #
+      # Various adjustments to timeleft
+      #
 
+      # X is forsaken by their evil god. \d+ days...
+      m = re.match(r'(.*?) is forsaken by their evil god. (\d+) days?, (\d{2}):(\d{2}):(\d{2})', line)
+      if m:
+        who, days, hours, mins, secs = m.groups()
+        duration = convert_to_duration(days, hours, mins, secs)
+        self[who]['timeleft'] += duration
+        self[who]['alignment'] = 'evil'
+
+      # X and Y have not let the iniquities of evil men.*them.  \d+% of their time
+      m = re.match(r'(.*?) and (.*?) have not let the iniquities of evil men.*them. (\d+)% of their time is removed from their clocks', line)
+      if m:
+        who1, who2, percentage = m.groups()
+        self.adjust_timeleft_percentage(who1, epoch, int(percentage))
+        self.adjust_timeleft_percentage(who2, epoch, int(percentage))
+        self[who1]['alignment'] = 'good'
+        self[who2]['alignment'] = 'good'
+
+      # I, J, and K [.*] have team battled.* and (won|lost)!
+      m = re.match(r'(.*?)\[.*?have team battled .*? and (won|lost)! (\d+) days?, (\d{2}):(\d{2}):(\d{2})', line)
+      if m:
+        team, result, days, hours, mins, secs = m.groups()
+        members = re.findall('[^, ]+', team)
+        members.remove('and')
+        duration = convert_to_duration(days, hours, mins, secs)
+        sign = -1 if (result == 'won') else 1
+        for who in members:
+          self[who]['timeleft'] += sign*duration
+
+  def update_offline(self):
+    # Mark people as offline if they're unknown but their ttl suggests they
+    # should have already levelled by now
+    for who in self:
+      if self[who]['online'] is None and \
+         self[who]['timeleft']+self[who]['last_logbreak_seen'] < now:
+        self[who]['online'] = False
+
+
+  def parse(self, fileobj):
+    try:
+      self.parse_lines(f)
+    except StopIteration:
+      pass
+    self.update_offline()
 
 def time_format(seconds):
   sign = '-' if seconds<0 else ' '
@@ -280,24 +329,22 @@ def time_format(seconds):
   daystr = sign+str(days)
   return '{:>3s}:{:02d}:{:02d}:{:02d}'.format(sign+str(days),hours,mins,seconds)
 
-def quest_info(started, time_left, quest_times):
-  if started:
-    if time_left: # Time-based quest
-      return "Will end in "+time_format(time_left)+\
-             "; Participants: "+questers
+def quest_info(stats):
+  if stats.quest_started:
+    if stats.quest_time_left: # Time-based quest
+      return "Will end in "+time_format(stats.quest_time_left)+\
+             "; Participants: "+stats.questers
     else:
       import numpy
-      beg_epoch = convert_to_epoch(started)
-      early = (beg_epoch+numpy.min(quest_times)-now)
-      likely = (beg_epoch+numpy.mean(quest_times)-now)
-      early = time_format(beg_epoch+numpy.min(quest_times)-now)
-      likely = time_format(beg_epoch+numpy.mean(quest_times)-now)
-      return "May end in {}; most likely to end in {}".format(early, likely)+\
-             "\nParticipants: "+questers
+      early = time_format(stats.quest_started+numpy.min(stats.quest_times)-now)
+      likly = time_format(stats.quest_started+numpy.mean(stats.quest_times)-now)
+      return "May end in {}; most likely to end in {}".format(early, likly)+\
+             "\nParticipants: "+stats.questers
   else:
-    return "None; next should start in {}".format(time_format(next_quest-now))
+    next_start = time_format(stats.next_quest-now)
+    return "None; next should start in "+next_start
 
-def battle_burn(who):
+def battle_burn(stats, who):
   # FIXME: Really ought to handle being hit by critical strikes from others too
   oncount = sum([1 for x in stats if stats[x]['online']])
   odds_fight_per_day = 24.0/oncount  # every hour, 1.0 selected to start fight
@@ -331,7 +378,7 @@ def battle_burn(who):
     percent_change += diff
   return percent_change/100.0 * (stats[who]['timeleft']-43200)
 
-def godsend_calamity_hog_burn(who):
+def godsend_calamity_hog_burn(stats, who):
   # 1/8 chance per day (per online user) of calamity
   # 1/4 chance per day (per online user) of godsend
   # 9/10 chance per day calamity or godsend will change ttl by 5-12%
@@ -343,7 +390,7 @@ def godsend_calamity_hog_burn(who):
   overall_percentage = (percent_godsend-percent_calamity+percent_hog)
   return overall_percentage * (stats[who]['timeleft']-43200)
 
-def alignment_burn(who):
+def alignment_burn(stats, who):
   if stats[who]['alignment'] == 'good':
     good_and_online_count = sum([1 for x in stats
                    if stats[x]['online'] and stats[x]['alignment'] == 'good'])
@@ -359,12 +406,12 @@ def alignment_burn(who):
   else:
     return 0
 
-def quest_burn(who):
+def quest_burn(stats, who):
   above_level_40 = sum([1 for x in stats
                         if stats[x]['online'] and stats[x]['level'] >= 40])
   if above_level_40 < 4:
     return 0
-  location_quest_average = sum(quest_times)/len(quest_times)
+  location_quest_average = sum(stats.quest_times)/len(stats.quest_times)
   time_quest_average = 86400*1.5
   average_quest_time = (location_quest_average+time_quest_average)/2
   average_wait_time = 21600 # Assumes quests end successfully
@@ -372,7 +419,7 @@ def quest_burn(who):
   odds_quest = 4.0/above_level_40
   return odds_quest * quests_per_day * .25 * stats[who]['timeleft']
 
-def expected_ttl_burn(who): # How much time-to-level will decrease in next day
+def expected_ttl_burn(stats, who): # How much time-to-level decrease in next day
   # If they're not online, their time-to-level isn't going to decrease at all
   if not stats[who]['online']:
     return 0
@@ -386,44 +433,41 @@ def expected_ttl_burn(who): # How much time-to-level will decrease in next day
     return 86400
 
   # Print out ttl burn info
-  #bb = battle_burn(who)
-  #gchb = godsend_calamity_hog_burn(who)
-  #ab = alignment_burn(who)
-  #qb = quest_burn(who)
+  #bb = battle_burn(stats, who)
+  #gchb = godsend_calamity_hog_burn(stats, who)
+  #ab = alignment_burn(stats, who)
+  #qb = quest_burn(stats, who)
   #print '     {}'.format((who,bb,gchb,ab,qb,time_format(86400+bb+gchb+ab+qb)))
 
   # By default, if people wait a day, a day of time-to-level burns
   ttl_burn = 86400
-  ttl_burn += battle_burn(who)
-  ttl_burn += godsend_calamity_hog_burn(who)
-  ttl_burn += alignment_burn(who)
+  ttl_burn += battle_burn(stats, who)
+  ttl_burn += godsend_calamity_hog_burn(stats, who)
+  ttl_burn += alignment_burn(stats, who)
 
   return ttl_burn
 
-# Mark people as offline if they're unknown but their ttl suggests they
-# should have already levelled by now
-for who in stats:
-  if stats[who]['online'] is None and \
-     stats[who]['timeleft']+stats[who]['last_logbreak_seen'] < now:
-    stats[who]['online'] = False
+rpgstats = IdlerpgStats()
+with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
+  rpgstats.parse(f)
 
 # Print out all the information we've collected
 brkln="--- --- ---- ------------ ---- ------------ ---------"
 print "Lvl On? ISum  Time-to-Lvl Algn ExpectedBurn character"
 last = True
-for who in sorted(stats, key=lambda x:(stats[x]['online'],stats[x]['timeleft'])):
-  on = 'yes' if stats[who]['online'] else ('???'
-             if stats[who]['online'] is None else 'no')
+for who in sorted(rpgstats, key=lambda x:(rpgstats[x]['online'],rpgstats[x]['timeleft'])):
+  on = 'yes' if rpgstats[who]['online'] else ('???'
+             if rpgstats[who]['online'] is None else 'no')
   assumed_on = bool(on=='yes')
   if assumed_on ^ last:
     print brkln
     last = assumed_on
   print('{:3d} {:3s} {:4d} {} {} {} {}'.format(
-           stats[who]['level'],
+           rpgstats[who]['level'],
            on,
-           stats[who]['itemsum'],
-           time_format(stats[who]['timeleft']),
-           stats[who]['alignment'][0:4],
-           time_format(expected_ttl_burn(who)),
+           rpgstats[who]['itemsum'],
+           time_format(rpgstats[who]['timeleft']),
+           rpgstats[who]['alignment'][0:4],
+           time_format(expected_ttl_burn(rpgstats, who)),
            who))
-print("Quest: "+quest_info(quest_started, quest_time_left, quest_times))
+print("Quest: "+quest_info(rpgstats))
