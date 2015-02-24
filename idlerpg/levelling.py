@@ -381,7 +381,7 @@ def battle_burn(stats, who):
     change_if_fight = odds_beat_opp*gain - (1-odds_beat_opp)*loss
     diff = change_if_fight*odds_fight_this_opp*odds_fight_per_day
     percent_change += diff
-  return percent_change/100.0 * (stats[who]['timeleft']-43200)
+  return percent_change/100.0
 
 def godsend_calamity_hog_burn(stats, who):
   # 1/8 chance per day (per online user) of calamity
@@ -393,7 +393,7 @@ def godsend_calamity_hog_burn(stats, who):
   percent_godsend  = .9*(1.0/4)*(.05+.12)/2
   percent_hog      = .05*       (.05+.75)/2*(.8-.2)
   overall_percentage = (percent_godsend-percent_calamity+percent_hog)
-  return overall_percentage * (stats[who]['timeleft']-43200)
+  return overall_percentage
 
 def alignment_burn(stats, who):
   if stats[who]['alignment'] == 'good':
@@ -403,11 +403,11 @@ def alignment_burn(stats, who):
       return 0
     percent = (.05+.12)/2
     odds = 2*(1.0/12)
-    return odds*percent*(stats[who]['timeleft']-43200)
+    return odds*percent
   elif stats[who]['alignment'] == 'evil':
     percent = (.01+.05)/2
     odds = .5*1.0/8
-    return -odds*percent*(stats[who]['timeleft']-43200)
+    return -odds*percent
   else:
     return 0
 
@@ -422,7 +422,7 @@ def quest_burn(stats, who):
   average_wait_time = 21600 # Assumes quests end successfully
   quests_per_day = 86400 / (average_quest_time + average_wait_time)
   odds_quest = 4.0/above_level_40
-  return odds_quest * quests_per_day * .25 * stats[who]['timeleft']
+  return odds_quest * quests_per_day * .25
 
 def expected_ttl_burn(stats, who): # How much time-to-level decrease in next day
   # If they're not online, their time-to-level isn't going to decrease at all
@@ -442,13 +442,17 @@ def expected_ttl_burn(stats, who): # How much time-to-level decrease in next day
   #gchb = godsend_calamity_hog_burn(stats, who)
   #ab = alignment_burn(stats, who)
   #qb = quest_burn(stats, who)
-  #print '     {}'.format((who,bb,gchb,ab,qb,time_format(86400+bb+gchb+ab+qb)))
+  #comb_burn = (bb+gchb+ab+qb) * (stats[who]['timeleft']-43200)
+  #print '     Additional burn: {:6.3f} {:6.3f} {:6.3f} {:6.3f}  {}  {}'.format(bb,gchb,ab,qb,time_format(comb_burn),who)
 
   # By default, if people wait a day, a day of time-to-level burns
   ttl_burn = 86400
-  ttl_burn += battle_burn(stats, who)
-  ttl_burn += godsend_calamity_hog_burn(stats, who)
-  ttl_burn += alignment_burn(stats, who)
+
+  addl_percentage_burn = 0
+  addl_percentage_burn += battle_burn(stats, who)
+  addl_percentage_burn += godsend_calamity_hog_burn(stats, who)
+  addl_percentage_burn += alignment_burn(stats, who)
+  ttl_burn += addl_percentage_burn * (stats[who]['timeleft']-43200)
 
   return ttl_burn
 
