@@ -1,5 +1,5 @@
 grep 'stole ' ~/.xchat2/xchatlogs/Palantir-#idlerpg.log | less
-grep made\ to\ steal ~/.xchat2/xchatlogs/Palantir-idlerpg.log | less
+grep -h made\ to\ steal ~/.xchat2/xchatlogs/Palantir-idlerpg.log ~/irclogs/Palantir/idlerpg.log
 ssh pt-scm-staging-01 grep '"made to steal"' irclogs/Palantir/idlerpg.log | tail -n 10 | less
 grep fierce  ~/.xchat2/xchatlogs/Palantir-#idlerpg.log | tail -n 10 | less
 eval $(grep -A 1 'latest battle' ~/notes/irc-hipchat-idlerpg/idlerpg/idlerpg.txt | tail -n 1)
