@@ -88,6 +88,11 @@ class IdlerpgStats(defaultdict):
     for who in IdlerpgStats.get_people_list(questers_string):
       self.adjust_timeleft_percentage(who, quest_end, 25)
 
+  def change_alignment(self, who, align):
+    factor = {'good':1.1, 'neutral':1.0, 'evil':0.9}
+    self[who]['alignment'], old = align, self[who]['alignment']
+    self[who]['itemsum'] = int(self[who]['itemsum']*factor[align]/factor[old])
+
   def next_lines(self, f):
     if self.last_line:
       yield self.last_line
@@ -266,7 +271,7 @@ class IdlerpgStats(defaultdict):
       m = re.match(r"(?P<who>.*) has changed alignment to: (.*)\.$", line)
       if m:
         who, align = m.groups()
-        self[who]['alignment'] = align
+        self.change_alignment(who, align)
         continue
 
       #
