@@ -441,14 +441,6 @@ def expected_ttl_burn(stats, who): # How much time-to-level decrease in next day
   if stats[who]['timeleft'] < 43200:
     return 86400
 
-  # Print out ttl burn info
-  #bb = battle_burn(stats, who)
-  #gchb = godsend_calamity_hog_burn(stats, who)
-  #ab = alignment_burn(stats, who)
-  #qb = quest_burn(stats, who)
-  #comb_burn = (bb+gchb+ab+qb) * (stats[who]['timeleft']-43200)
-  #print '     Additional burn: {:6.3f} {:6.3f} {:6.3f} {:6.3f}  {}  {}'.format(bb,gchb,ab,qb,time_format(comb_burn),who)
-
   # By default, if people wait a day, a day of time-to-level burns
   ttl_burn = 86400
 
@@ -482,6 +474,20 @@ def print_summary_info(rpgstats):
              who))
   print("Quest: "+quest_info(rpgstats))
 
+def print_detailed_burn_info(rpgstats):
+  print "Battle g/c/hog align  quest  Comb'd  BurnRate Now  Character"
+  print "------ ------ ------ ------  ------  ------------  ---------"
+  for who in sorted(rpgstats, key=lambda x:rpgstats[x]['itemsum']):
+    if not rpgstats[who]['online']:
+      continue
+    bb = battle_burn(rpgstats, who)
+    gchb = godsend_calamity_hog_burn(rpgstats, who)
+    ab = alignment_burn(rpgstats, who)
+    qb = quest_burn(rpgstats, who)
+    comb = bb+gchb+ab+qb
+    comb_burn = comb * max(rpgstats[who]['timeleft']-43200, 0)
+    print '{:6.3f} {:6.3f} {:6.3f} {:6.3f}  {:6.3f}  {}  {}'.format(bb,gchb,ab,qb,comb,time_format(comb_burn),who)
+
 def print_recent(iterable):
   # Print out recent battlers and counts
   acount = Counter(iterable)
@@ -495,5 +501,6 @@ rpgstats = IdlerpgStats(40)
 with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
   rpgstats.parse(f)
 print_summary_info(rpgstats)
+print_detailed_burn_info(rpgstats)
 #print_recent(rpgstats.recent['attackers'])
 #print_recent(rpgstats.recent['questers'])
