@@ -10,7 +10,7 @@
 #     come in giving me updated information.
 
 from datetime import datetime, timedelta
-from collections import defaultdict
+from collections import defaultdict, deque, Counter
 import argparse
 import math
 import re
@@ -39,9 +39,12 @@ def default_player():
           'online':None, 'last_logbreak_seen':0}
 
 class IdlerpgStats(defaultdict):
-  def __init__(self):
+  def __init__(self, max_recent_count = 100):
     super(IdlerpgStats, self).__init__(default_player)
     self.player = {}  # ircnick -> who_string
+    self.recent = {'attackers'  : deque(maxlen=max_recent_count),
+                   'questers'   : deque(maxlen=max_recent_count),
+                  }
     self.quest_started = None  # time_string or None
     self.quest_times = []
     self.quest_started = None
@@ -153,6 +156,7 @@ class IdlerpgStats(defaultdict):
         self.quest_started = epoch
         for who in IdlerpgStats.get_people_list(self.questers):
           self[who]['online'] = True
+          self.recent['questers'].append(who)
         continue
       m = re.match(r"(.*) have been chosen.*Quest to end in (\d+) days?, (\d{2}):(\d{2}):(\d{2})", line)
       if m:
@@ -162,6 +166,7 @@ class IdlerpgStats(defaultdict):
         self.quest_time_left = self.quest_started+duration-now
         for who in IdlerpgStats.get_people_list(self.questers):
           self[who]['online'] = True
+          self.recent['questers'].append(who)
         continue
 
       #
@@ -252,6 +257,7 @@ class IdlerpgStats(defaultdict):
       m = re.match(r"(?P<attacker>.*) \[\d+/(?P<attacker_sum>\d+)\] has (?:challenged|come upon) (?P<defender>.*) \[\d+/(?P<defender_sum>\d+)\]", line)
       if m:
         attacker, attacker_sum, defender, defender_sum = m.groups()
+        self.recent['attackers'].append(attacker)
         if attacker != 'idlerpg':
           self[attacker]['itemsum'] = int(attacker_sum)
           self[attacker]['online'] = True
@@ -475,8 +481,18 @@ def print_summary_info(rpgstats):
              who))
   print("Quest: "+quest_info(rpgstats))
 
+def print_recent(iterable):
+  # Print out recent battlers and counts
+  acount = Counter(iterable)
+  print "Count Individual"
+  print "----- ----------"
+  for who in sorted(acount, key=lambda x:acount[x], reverse=True):
+    print "{:5d} {}".format(acount[who], who)
+
 parse_args()
-rpgstats = IdlerpgStats()
+rpgstats = IdlerpgStats(40)
 with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
   rpgstats.parse(f)
 print_summary_info(rpgstats)
+#print_recent(rpgstats.recent['attackers'])
+#print_recent(rpgstats.recent['questers'])
