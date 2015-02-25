@@ -422,7 +422,7 @@ def quest_burn(stats, who):
     return 0
   location_quest_average = sum(stats.quest_times)/len(stats.quest_times)
   time_quest_average = 86400*1.5
-  average_quest_time = (location_quest_average+time_quest_average)/2
+  average_quest_time = (location_quest_average*12.0+time_quest_average*5.0)/17
   average_wait_time = 21600 # Assumes quests end successfully
   quests_per_day = 86400 / (average_quest_time + average_wait_time)
   odds_quest = 4.0/above_level_40
