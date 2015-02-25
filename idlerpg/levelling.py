@@ -376,10 +376,11 @@ def battle_burn(stats, who):
     diff = change_if_fight*odds_fight_this_opp*odds_fight_per_day
     percent_change += diff
   if True: # Also handle idlerpg
+    idlerpg_sum = 1+max(stats[x]['itemsum'] for x in stats)
     gain = 20
     loss = 10
     odds_fight_this_opp = 1.0/oncount # oncount-1 other players, plus idlerpg
-    odds_beat_opp = stats[who]['itemsum']/(stats[who]['itemsum']+stats['idlerpg']['itemsum']+0.0)
+    odds_beat_opp = stats[who]['itemsum']/(stats[who]['itemsum']+idlerpg_sum+0.0)
 
     change_if_fight = odds_beat_opp*gain - (1-odds_beat_opp)*loss
     diff = change_if_fight*odds_fight_this_opp*odds_fight_per_day
