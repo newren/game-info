@@ -17,7 +17,7 @@ import re
 import subprocess
 import time
 
-now = time.time()
+now = time.time()  # Yeah, yeah, globals are bad.  *shrug*
 
 def parse_args():
   global now
@@ -37,10 +37,6 @@ def convert_to_duration(days, hours, mins, secs):
 def default_player():
   return {'level':0, 'timeleft':0, 'itemsum':0, 'alignment':'neutral',
           'online':None, 'last_logbreak_seen':0}
-
-parse_args()
-postdate_re="(?P<postdate>[\d-]{10} [\d:]{8}) <idlerpg>\t"
-nextlvl_re="[Nn]ext level in (?P<days>\d+) days?, (?P<hours>\d{2}):(?P<mins>\d{2}):(?P<secs>\d{2})"
 
 class IdlerpgStats(defaultdict):
   def __init__(self):
@@ -101,6 +97,7 @@ class IdlerpgStats(defaultdict):
       yield line
 
   def parse_lines(self, f):
+    nextlvl_re="[Nn]ext level in (?P<days>\d+) days?, (?P<hours>\d{2}):(?P<mins>\d{2}):(?P<secs>\d{2})"
     for line in self.next_lines(f):
       #
       # Check for going offline
@@ -139,7 +136,7 @@ class IdlerpgStats(defaultdict):
       #
       # ALL CASES: Get the time of the post, and the remainder of the line
       #
-      m = re.match(postdate_re+"(.*)$", line)
+      m = re.match("(?P<postdate>[\d-]{10} [\d:]{8}) <idlerpg>\t(.*)$", line)
       if not m:
         continue
       postdate, line = m.groups()
@@ -251,7 +248,7 @@ class IdlerpgStats(defaultdict):
       # Check for itemsums
       #
 
-      # Just a single user quitting
+      # Two individuals battling, either due to time (1/hour) or space (grid)
       m = re.match(r"(?P<attacker>.*) \[\d+/(?P<attacker_sum>\d+)\] has (?:challenged|come upon) (?P<defender>.*) \[\d+/(?P<defender_sum>\d+)\]", line)
       if m:
         attacker, attacker_sum, defender, defender_sum = m.groups()
@@ -456,27 +453,30 @@ def expected_ttl_burn(stats, who): # How much time-to-level decrease in next day
 
   return ttl_burn
 
+def print_summary_info(rpgstats):
+  # Print out all the information we've collected
+  brkln="--- --- ---- ------------ ---- ------------ ---------"
+  print "Lvl On? ISum  Time-to-Lvl Algn ExpectedBurn character"
+  last = True
+  for who in sorted(rpgstats, key=lambda x:(rpgstats[x]['online'],rpgstats[x]['timeleft'])):
+    on = 'yes' if rpgstats[who]['online'] else ('???'
+               if rpgstats[who]['online'] is None else 'no')
+    assumed_on = bool(on=='yes')
+    if assumed_on ^ last:
+      print brkln
+      last = assumed_on
+    print('{:3d} {:3s} {:4d} {} {} {} {}'.format(
+             rpgstats[who]['level'],
+             on,
+             rpgstats[who]['itemsum'],
+             time_format(rpgstats[who]['timeleft']),
+             rpgstats[who]['alignment'][0:4],
+             time_format(expected_ttl_burn(rpgstats, who)),
+             who))
+  print("Quest: "+quest_info(rpgstats))
+
+parse_args()
 rpgstats = IdlerpgStats()
 with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
   rpgstats.parse(f)
-
-# Print out all the information we've collected
-brkln="--- --- ---- ------------ ---- ------------ ---------"
-print "Lvl On? ISum  Time-to-Lvl Algn ExpectedBurn character"
-last = True
-for who in sorted(rpgstats, key=lambda x:(rpgstats[x]['online'],rpgstats[x]['timeleft'])):
-  on = 'yes' if rpgstats[who]['online'] else ('???'
-             if rpgstats[who]['online'] is None else 'no')
-  assumed_on = bool(on=='yes')
-  if assumed_on ^ last:
-    print brkln
-    last = assumed_on
-  print('{:3d} {:3s} {:4d} {} {} {} {}'.format(
-           rpgstats[who]['level'],
-           on,
-           rpgstats[who]['itemsum'],
-           time_format(rpgstats[who]['timeleft']),
-           rpgstats[who]['alignment'][0:4],
-           time_format(expected_ttl_burn(rpgstats, who)),
-           who))
-print("Quest: "+quest_info(rpgstats))
+print_summary_info(rpgstats)
