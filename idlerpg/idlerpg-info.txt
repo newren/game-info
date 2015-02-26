@@ -118,3 +118,39 @@ Yojoe the Local (just an awesome choice)
   helm                            Y- 50, 75
   pair of boots                   Y-250,300
   pair of gloves
+
+
+Expected time to next level:
+    y(t) = time-to-next-level as a function of time.
+    y' = -1 - r*y
+  where r is a factor depending upon battles, godsends, calamities, hogs,
+  alignment benefits or detriments, and quests.  Solving this ODE:
+    y = Ae^{-rt} - 1/r
+    y' = -rAe^{-rt} = -1+1 -r*(Ae^{-rt})
+                    = -1 -r*(Ae^{-rt}) -r*(-1/r)
+                    = -1 -r*(Ae^{-rt}-1/r)
+                    = -1 -r*y
+    y0 = A*1 - 1/r
+    A = y0 + 1/r
+  Therefore:
+    y = (y0+1/r)e^{-rt} - 1/r
+  and we reach the next level when y = 0:
+    0 = (y0+1/r)e^{-rt} - 1/r
+    0 = (r*y0+1)e^{-rt} - 1
+    e^{-rt} = 1/(r*y0+1)
+    -rt = ln(1/(r*y0+1))
+        = ln 1 - ln(r*y0+1)
+        = -ln(r*y0+1)
+    t = 1/r*ln(r*y0+1)
+  Also, in limit r->0,
+    y = -1/r + (y0+1/r)e^{-rt}
+      ~ -1/r + (y0+1/r)(1 + (-rt) + 1/2*(-rt)^2)
+      = -1/r + y0 + 1/r - y0*rt -1/r*rt + (y0+1/r)(1/2)(rt)^2
+      = y0 - y0*rt - t + (y0+1/r)(1/2)r^2*t^2
+      -> y0 - t
+  and
+    t = 1/r*ln(1+r*y0)
+      (L'Hospital) -> 1/(1+r*y0)*y0
+      -> 1/(1+0)*y0
+      = y0
+  as expected.
