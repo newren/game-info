@@ -44,6 +44,9 @@ class IdlerpgStats(defaultdict):
     self.player = {}  # ircnick -> who_string
     self.recent = {'attackers'  : deque(maxlen=max_recent_count),
                    'questers'   : deque(maxlen=max_recent_count),
+                   'godsends'   : deque(maxlen=max_recent_count),
+                   'calamities' : deque(maxlen=max_recent_count),
+                   'hogs'       : deque(maxlen=max_recent_count),
                   }
     self.quest_started = None  # time_string or None
     self.quest_times = []
@@ -278,6 +281,34 @@ class IdlerpgStats(defaultdict):
         continue
 
       #
+      # Check for godsends, calamities, and hogs
+      #
+      m = re.match('(?P<who>\w+).*gains 10% of its effectiveness', line)
+      if m:
+        self.recent['godsends'].append(m.group('who'))
+        continue
+      m = re.match('(?P<who>\w+).*wondrous godsend has accelerated', line)
+      if m:
+        self.recent['godsends'].append(m.group('who'))
+        continue
+      m = re.match('(?P<who>\w+).*loses 10% of its effectiveness', line)
+      if m:
+        self.recent['calamities'].append(m.group('who'))
+        continue
+      m = re.match('(?P<who>\w+).*terrible calamity has slowed them', line)
+      if m:
+        self.recent['calamities'].append(m.group('who'))
+        continue
+      m = re.match('.*hand of God carried (?P<who>\w+).*toward level', line)
+      if m:
+        self.recent['hogs'].append(m.group('who'))
+        continue
+      m = re.match('Thereupon.*consumed (?P<who>\w+) with fire, slowing', line)
+      if m:
+        self.recent['hogs'].append(m.group('who'))
+        continue
+
+      #
       # Various adjustments to timeleft
       #
 
@@ -502,5 +533,9 @@ with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
   rpgstats.parse(f)
 print_summary_info(rpgstats)
 print_detailed_burn_info(rpgstats)
-#print_recent(rpgstats.recent['attackers'])
-#print_recent(rpgstats.recent['questers'])
+if False:
+  print_recent(rpgstats.recent['attackers'])
+  print_recent(rpgstats.recent['questers'])
+  print_recent(rpgstats.recent['godsends'])
+  print_recent(rpgstats.recent['calamities'])
+  print_recent(rpgstats.recent['hogs'])
