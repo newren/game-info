@@ -384,7 +384,6 @@ def quest_info(stats):
     return "None; next should start in "+next_start
 
 def battle_burn(stats, who):
-  # FIXME: Really ought to handle being hit by critical strikes from others too
   oncount = sum([1 for x in stats if stats[x]['online']])
   odds_fight_per_day = 24.0/oncount  # every hour, 1.0 selected to start fight
   odds_fight_per_day += 1.5/oncount  # 1.5ish grid battles per day
@@ -417,6 +416,23 @@ def battle_burn(stats, who):
     diff = change_if_fight*odds_fight_this_opp*odds_fight_per_day
     percent_change += diff
   return percent_change/100.0
+
+def critical_strike_rate(stats,who):
+  oncount = sum([1 for x in stats if stats[x]['online']])
+  crit_factor = {'good':1.0/50, 'neutral':1.0/35, 'evil':1.0/20}
+  odds_fight_per_day = 24.0/oncount  # every hour, 1.0 selected to start fight
+  odds_fight_per_day += 1.5/oncount  # 1.5ish grid battles per day
+  rate = 0
+  for opp in stats:
+    if opp == who or not stats[opp]['online']:
+      continue
+    odds_fight_this_opp = 1.0/oncount # oncount-1 other players, plus idlerpg
+    odds_beaten_by_opp = stats[opp]['itemsum']/(stats[who]['itemsum']+stats[opp]['itemsum']+0.0)
+
+    odds_lose = odds_fight_per_day*odds_fight_this_opp*odds_beaten_by_opp
+    rate += odds_lose * crit_factor[stats[opp]['alignment']] * 15.0/100
+
+  return rate
 
 def godsend_calamity_hog_burn(stats, who):
   # 1/8 chance per day (per online user) of calamity
@@ -535,8 +551,8 @@ def print_summary_info(rpgstats):
   print("Quest: "+quest_info(rpgstats))
 
 def print_detailed_burn_info(rpgstats):
-  print "Battle g/c/hog align  quest Comb'd    qmod Comb'd  Xburn  Character"
-  print "------ ------ ------ ------ ------  ------ ------  -----  ---------"
+  print "Battle g/c/hog align  quest Comb'd    qmod Comb'd  Xburn CritS  Character"
+  print "------ ------ ------ ------ ------  ------ ------  ----- -----  ---------"
   for who in sorted(rpgstats, key=lambda x:rpgstats[x]['itemsum']):
     bb = battle_burn(rpgstats, who)
     gchb = godsend_calamity_hog_burn(rpgstats, who)
@@ -544,7 +560,8 @@ def print_detailed_burn_info(rpgstats):
     qbdef, qbtweak, antiburn = quest_burn(rpgstats, who)
     combdef = bb+gchb+ab+qbdef
     combtweak = bb+gchb+ab+qbtweak
-    print '{:6.3f} {:6.3f} {:6.3f} {:6.3f} {:6.3f}  {:6.3f} {:6.3f}  {:5.2f}  {}'.format(bb,gchb,ab,qbdef,combdef,qbtweak,combtweak,antiburn/86400,who)
+    critrate = critical_strike_rate(rpgstats,who)
+    print '{:6.3f} {:6.3f} {:6.3f} {:6.3f} {:6.3f}  {:6.3f} {:6.3f}  {:5.2f} {:5.3f}  {}'.format(bb,gchb,ab,qbdef,combdef,qbtweak,combtweak,antiburn/86400,critrate,who)
 
 def print_recent(iterable):
   # Print out recent battlers and counts
