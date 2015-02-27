@@ -451,42 +451,69 @@ def quest_burn(stats, who):
                         if stats[x]['online'] and stats[x]['level'] >= 40])
   if above_level_40 < 4:
     return 0
+
+  # Determine average quest duration
   location_quest_average = sum(stats.quest_times)/len(stats.quest_times)
   time_quest_average = 86400*1.5
   average_quest_time = (location_quest_average*12.0+time_quest_average*5.0)/17
-  average_wait_time = 21600 # Assumes quests end successfully
+
+  # Find various odds of folks a,b,c being involved or not
+  odds_a = 4.0/above_level_40
+  odds_not_a_but_b = (4.0*(above_level_40-4))/(
+                      above_level_40*(above_level_40-1))
+  odds_a_and_c =  (4.0*3)/((above_level_40)*(above_level_40-1))
+  odds_not_a_not_b_but_c = (4.0*(above_level_40-4)*(above_level_40-5))/(
+                      (above_level_40)*(above_level_40-1)*(above_level_40-2))
+  odds_c = odds_a_and_c + odds_not_a_not_b_but_c # not_a_but_b_and_c ignored
+
+  # Determine quests per day
+  fail_quest_percentage = odds_not_a_but_b
+  average_wait_time = 21600*(1+fail_quest_percentage)  # Yes '+', after simplify
   quests_per_day = 86400 / (average_quest_time + average_wait_time)
-  odds_quest = 4.0/above_level_40
-  return odds_quest * quests_per_day * .25
 
-def expected_ttl_burn(stats, who): # How much time-to-level decrease in next day
-  # If they're not online, their time-to-level isn't going to decrease at all
-  if not stats[who]['online']:
-    return 0
+  # Determine antiburn
+  pen = min(86400*7, 15*1.14**stats[who]['level'])
+  antiburn = pen*quests_per_day*fail_quest_percentage
 
-  # If user has less than a day left, the fact that we tend to burn faster more
-  # than a day's worth of time-to-level per day becomes a bit weird.  The
-  # correct amount to report will depend upon what their ttl becomes after they
-  # go to the next level.  For now, just pretend they'll burn at a flat rate
-  # if they have less than half a day left
-  if stats[who]['timeleft'] < 43200:
-    return 86400
+  # Find rates and return them
+  idlerpg = (sum(ord(x) for x in who) == 621)
+  optimistic_rate = quests_per_day * odds_a * .25
+  expected_rate   = quests_per_day * odds_c * .25
+  if idlerpg:
+    return optimistic_rate, optimistic_rate, antiburn
+  else:
+    return optimistic_rate, expected_rate, antiburn
 
-  # By default, if people wait a day, a day of time-to-level burns
-  ttl_burn = 86400
+def solve_ttl_to_0(ttl, r, p):
+  # ttl in seconds, burn_rate in days, antiburn in seconds; get common units
+  ttl /= 86400.0
+  p /= 86400.0
+  try:
+    ttl_burn_time = (-1/r)*math.log((1-p)/(r*ttl+1-p))
+    # Switch back to seconds
+    ttl_burn_time *= 86400
+  except ValueError:
+    ttl_burn_time = 86400*100-1  # 100 days - 1 second, basically infinity
 
-  addl_percentage_burn = 0
-  addl_percentage_burn += battle_burn(stats, who)
-  addl_percentage_burn += godsend_calamity_hog_burn(stats, who)
-  addl_percentage_burn += alignment_burn(stats, who)
-  ttl_burn += addl_percentage_burn * (stats[who]['timeleft']-43200)
+  return ttl_burn_time
 
-  return ttl_burn
+def expected_ttl(stats, who): # How much time-to-level decrease in next day
+  cur_ttl = stats[who]['timeleft']
+
+  burn_rate = 0
+  burn_rate += battle_burn(stats, who)
+  burn_rate += godsend_calamity_hog_burn(stats, who)
+  burn_rate += alignment_burn(stats, who)
+  default_burn_rate, tweaked_burn_rate, antiburn = quest_burn(stats, who)
+
+  ttl1 = solve_ttl_to_0(cur_ttl, burn_rate + default_burn_rate, 0)
+  ttl2 = solve_ttl_to_0(cur_ttl, burn_rate + tweaked_burn_rate, antiburn)
+  return ttl1, ttl2
 
 def print_summary_info(rpgstats):
   # Print out all the information we've collected
-  brkln="--- --- ---- ------------ ---- ------------ ---------"
-  print "Lvl On? ISum  Time-to-Lvl Algn ExpectedBurn character"
+  brkln="--- --- ---- ------------ ---- ------------ ------------ ---------"
+  print "Lvl On? ISum  Time-to-Lvl Algn   Optimistic Expected TTL character"
   last = True
   for who in sorted(rpgstats, key=lambda x:(rpgstats[x]['online'],rpgstats[x]['timeleft'])):
     on = 'yes' if rpgstats[who]['online'] else ('???'
@@ -495,29 +522,29 @@ def print_summary_info(rpgstats):
     if assumed_on ^ last:
       print brkln
       last = assumed_on
-    print('{:3d} {:3s} {:4d} {} {} {} {}'.format(
+    ettl1, ettl2 = expected_ttl(rpgstats, who)
+    print('{:3d} {:3s} {:4d} {} {} {} {} {}'.format(
              rpgstats[who]['level'],
              on,
              rpgstats[who]['itemsum'],
              time_format(rpgstats[who]['timeleft']),
              rpgstats[who]['alignment'][0:4],
-             time_format(expected_ttl_burn(rpgstats, who)),
+             time_format(ettl1),
+             time_format(ettl2),
              who))
   print("Quest: "+quest_info(rpgstats))
 
 def print_detailed_burn_info(rpgstats):
-  print "Battle g/c/hog align  quest  Comb'd  BurnRate Now  Character"
-  print "------ ------ ------ ------  ------  ------------  ---------"
+  print "Battle g/c/hog align  quest Comb'd    qmod Comb'd  Xburn  Character"
+  print "------ ------ ------ ------ ------  ------ ------  -----  ---------"
   for who in sorted(rpgstats, key=lambda x:rpgstats[x]['itemsum']):
-    if not rpgstats[who]['online']:
-      continue
     bb = battle_burn(rpgstats, who)
     gchb = godsend_calamity_hog_burn(rpgstats, who)
     ab = alignment_burn(rpgstats, who)
-    qb = quest_burn(rpgstats, who)
-    comb = bb+gchb+ab+qb
-    comb_burn = comb * max(rpgstats[who]['timeleft']-43200, 0)
-    print '{:6.3f} {:6.3f} {:6.3f} {:6.3f}  {:6.3f}  {}  {}'.format(bb,gchb,ab,qb,comb,time_format(comb_burn),who)
+    qbdef, qbtweak, antiburn = quest_burn(rpgstats, who)
+    combdef = bb+gchb+ab+qbdef
+    combtweak = bb+gchb+ab+qbtweak
+    print '{:6.3f} {:6.3f} {:6.3f} {:6.3f} {:6.3f}  {:6.3f} {:6.3f}  {:5.2f}  {}'.format(bb,gchb,ab,qbdef,combdef,qbtweak,combtweak,antiburn/86400,who)
 
 def print_recent(iterable):
   # Print out recent battlers and counts
