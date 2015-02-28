@@ -24,9 +24,12 @@ def parse_args():
   parser = argparse.ArgumentParser(description='Frobnicate the unobtanium')
   parser.add_argument('--until', type=str,
                       help='Get state of channel until this specified time (default: now)')
+  parser.add_argument('--whatif', type=str, action='append', default=[],
+                      help='Changes; comma-sep-userlist[:attribN:valueN]*')
   args = parser.parse_args()
   if args.until:
     now = convert_to_epoch(args.until)
+  return args
 
 def convert_to_epoch(timestring):
   timetuple = datetime.strptime(timestring, '%Y-%m-%d %H:%M:%S').timetuple()
@@ -94,6 +97,24 @@ class IdlerpgStats(defaultdict):
     factor = {'good':1.1, 'neutral':1.0, 'evil':0.9}
     self[who]['alignment'], old = align, self[who]['alignment']
     self[who]['itemsum'] = int(self[who]['itemsum']*factor[align]/factor[old])
+
+  def apply_attribute_modifications(self, attrib_list_changes):
+    if attrib_list_changes:
+      what = attrib_list_changes.split(':')
+      if len(what)%2 != 1:
+        raise SystemExit("Correct format: comma-sep-userlist[:attribN:valueN]*")
+      userlist = what[0].split(',')
+      for i in xrange(1,len(what),2):
+        attrib,value = what[i],what[i+1]
+        try:
+          value = int(value)
+        except ValueError:
+          pass
+        for who in userlist:
+          if attrib == 'alignment':
+            rpgstats.change_alignment(who, value)
+          else:
+            rpgstats[who][attrib] = value
 
   def next_lines(self, f):
     if self.last_line:
@@ -571,10 +592,12 @@ def print_recent(iterable):
   for who in sorted(acount, key=lambda x:acount[x], reverse=True):
     print "{:5d} {}".format(acount[who], who)
 
-parse_args()
+args = parse_args()
 rpgstats = IdlerpgStats(40)
 with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
   rpgstats.parse(f)
+for whatif in args.whatif:
+  rpgstats.apply_attribute_modifications(whatif)
 print_summary_info(rpgstats)
 print_detailed_burn_info(rpgstats)
 if False:
