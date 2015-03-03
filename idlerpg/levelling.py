@@ -378,6 +378,9 @@ class IdlerpgStats(defaultdict):
     self.update_offline()
 
 def time_format(seconds):
+  if seconds == float('inf'):
+    seconds = 86400*100-1  # 100 days - 1 second, basically infinity
+    #return "     Never  "
   sign = '-' if seconds<0 else ' '
   seconds = -1*seconds if seconds < 0 else seconds
   days = int(seconds/86400)
@@ -525,14 +528,14 @@ def solve_ttl_to_0(ttl, r, p):
   # ttl in seconds, burn_rate in days, antiburn in seconds; get common units
   ttl /= 86400.0
   p /= 86400.0
-  try:
-    ttl_burn_time = (-1/r)*math.log((1-p)/(r*ttl+1-p))
-    # Switch back to seconds
-    ttl_burn_time *= 86400
-  except ValueError:
-    ttl_burn_time = 86400*100-1  # 100 days - 1 second, basically infinity
 
-  return ttl_burn_time
+  # Compute ttl_burn_time
+  if p > 1: # Can't complete (in positive time)
+    return float('inf')
+  ttl_burn_time = (-1/r)*math.log((1-p)/(r*ttl+1-p))
+
+  # Switch back to seconds
+  return ttl_burn_time * 86400
 
 def advance_by_time(original_ttl, r, p, time_advance):
   # ttl,p,time_advance in seconds; burn_rate in days; get common units
