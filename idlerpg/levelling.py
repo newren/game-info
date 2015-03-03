@@ -534,17 +534,35 @@ def solve_ttl_to_0(ttl, r, p):
 
   return ttl_burn_time
 
-def expected_ttl(stats, who): # How much time-to-level decrease in next day
-  cur_ttl = stats[who]['timeleft']
+def advance_by_time(original_ttl, r, p, time_advance):
+  # ttl,p,time_advance in seconds; burn_rate in days; get common units
+  original_ttl /= 86400.0
+  p /= 86400.0
+  time_advance /= 86400
 
+  # Do the computation
+  result = (original_ttl+(1-p)/r)*math.exp(-r*time_advance) - (1-p)/r
+
+  # Convert back to seconds, and return it
+  result *= 86400
+  return result
+
+def get_burn_rates(stats, who):
   burn_rate = 0
   burn_rate += battle_burn(stats, who)
   burn_rate += godsend_calamity_hog_burn(stats, who)
   burn_rate += alignment_burn(stats, who)
-  default_burn_rate, tweaked_burn_rate, antiburn = quest_burn(stats, who)
+  quest_default_br, quest_tweaked_br, antiburn = quest_burn(stats, who)
 
-  ttl1 = solve_ttl_to_0(cur_ttl, burn_rate + default_burn_rate, 0)
-  ttl2 = solve_ttl_to_0(cur_ttl, burn_rate + tweaked_burn_rate, antiburn)
+  return burn_rate + quest_default_br, burn_rate + quest_tweaked_br, antiburn
+
+def expected_ttl(stats, who): # How much time-to-level decrease in next day
+  cur_ttl = stats[who]['timeleft']
+
+  optimal_burn_rate, expected_burn_rate, antiburn = get_burn_rates(stats, who)
+
+  ttl1 = solve_ttl_to_0(cur_ttl, optimal_burn_rate, 0)
+  ttl2 = solve_ttl_to_0(cur_ttl, expected_burn_rate, antiburn)
   return ttl1, ttl2
 
 def print_summary_info(rpgstats):
@@ -592,6 +610,45 @@ def print_recent(iterable):
   for who in sorted(acount, key=lambda x:acount[x], reverse=True):
     print "{:5d} {}".format(acount[who], who)
 
+def print_next_levelling(stats):
+  def basic_time_to_level(level):
+    return 600*1.16**min(level,60) + 86400*max(level-60, 0)
+  onliners = [who for who in stats if stats[who]['online']]
+
+  cur = now
+  ettl = {}
+  br = {}
+  ab = {}
+  while True:
+    minpair = (float('inf'), None)
+    # Find the burn rate, antiburn, and expected ttl for each player
+    # as well as the player with least expected ttl
+    for who in onliners:
+      br1, br2, antiburn = get_burn_rates(stats, who)
+      br[who] = br2
+      ab[who] = antiburn
+      ettl[who] = solve_ttl_to_0(stats[who]['timeleft'], br2, antiburn)
+      if ettl[who] < minpair[0]:
+        minpair = ettl[who], who
+
+    # Advance time by least expected ttl
+    t_adv, who_adv = minpair
+    if who_adv is None:
+      raise SystemExit("No more levelling.")
+    cur += t_adv
+
+    # Advance each player forward in time by least expected ttl
+    for who in onliners:
+      stats[who]['timeleft'] = advance_by_time(stats[who]['timeleft'], br[who],
+                                               ab[who], t_adv)
+    # Advance specified player to next level
+    stats[who_adv]['level'] += 1
+    stats[who_adv]['timeleft'] = basic_time_to_level(stats[who_adv]['level'])
+
+    # Notify that who_adv is expected to level at the given time
+    timestr = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(cur))
+    print("{} {:3d} {}".format(timestr, stats[who_adv]['level'], who_adv))
+
 args = parse_args()
 rpgstats = IdlerpgStats(40)
 with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
@@ -606,3 +663,5 @@ if False:
   print_recent(rpgstats.recent['godsends'])
   print_recent(rpgstats.recent['calamities'])
   print_recent(rpgstats.recent['hogs'])
+if False:
+  print_next_levelling(rpgstats)
