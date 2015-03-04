@@ -409,8 +409,10 @@ def quest_info(stats):
 
 def battle_burn(stats, who):
   oncount = sum([1 for x in stats if stats[x]['online']])
-  odds_fight_per_day = 24.0/oncount  # every hour, 1.0 selected to start fight
-  odds_fight_per_day += 1.5/oncount  # 1.5ish grid battles per day
+  odds_fight_per_day = 0
+  if stats[who]['level'] >= 45:
+    odds_fight_per_day += 24.0/oncount # every hour, 1.0 selected to start fight
+  odds_fight_per_day += 1.5/oncount  # 1.5ish grid battles/day, from past stats
   # team battles are basically a wash; the reward is equal to the loss, so the
   # only probabilistic difference is if your itemsum is higher or lower than
   # average making you more or less likely than 50% to win.
@@ -490,7 +492,7 @@ def quest_burn(stats, who):
   above_level_40 = sum([1 for x in stats
                         if stats[x]['online'] and stats[x]['level'] >= 40])
   if above_level_40 < 4:
-    return 0
+    return 0, 0, 0
 
   # Determine average quest duration
   location_quest_average = sum(stats.quest_times)/len(stats.quest_times)
@@ -519,7 +521,9 @@ def quest_burn(stats, who):
   idlerpg = (sum(ord(x) for x in who) == 621)
   optimistic_rate = quests_per_day * odds_a * .25
   expected_rate   = quests_per_day * odds_c * .25
-  if idlerpg:
+  if stats[who]['level'] < 40:
+    return 0, 0, antiburn
+  elif idlerpg:
     return optimistic_rate, optimistic_rate, antiburn
   else:
     return optimistic_rate, expected_rate, antiburn
