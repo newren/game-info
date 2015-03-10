@@ -26,6 +26,10 @@ def parse_args():
                       help='Get state of channel until this specified time (default: now)')
   parser.add_argument('--whatif', type=str, action='append', default=[],
                       help='Changes; comma-sep-userlist[:attribN:valueN]*')
+  parser.add_argument('--show', type=str, default='summary',
+                      choices=['summary', 'burninfo', 'recent', 'levelling',
+                               'plot_levelling', 'bad'],
+                      help='Which kind of info to show')
   args = parser.parse_args()
   if args.until:
     now = convert_to_epoch(args.until)
@@ -661,13 +665,17 @@ with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
   rpgstats.parse(f)
 for whatif in args.whatif:
   rpgstats.apply_attribute_modifications(whatif)
-print_summary_info(rpgstats)
-print_detailed_burn_info(rpgstats)
-if False:
+if args.show == 'summary':
+  print_summary_info(rpgstats)
+elif args.show == 'burninfo':
+  print_detailed_burn_info(rpgstats)
+elif args.show == 'recent':
   print_recent(rpgstats.recent['attackers'])
   print_recent(rpgstats.recent['questers'])
   print_recent(rpgstats.recent['godsends'])
   print_recent(rpgstats.recent['calamities'])
   print_recent(rpgstats.recent['hogs'])
-if False:
+elif args.show == 'levelling':
   print_next_levelling(rpgstats)
+else:
+  raise SystemExit("Unrecognized --show flag: "+args.show)
