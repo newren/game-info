@@ -62,6 +62,7 @@ class IdlerpgStats(defaultdict):
     self.questers = None
     self.next_quest = 0
     self.last_line = None
+    self.levels = defaultdict(list)
 
   def handle_timeleft(self, m, epoch):
     who = m.group('who')
@@ -237,6 +238,7 @@ class IdlerpgStats(defaultdict):
       if m:
         self.handle_timeleft(m, epoch)
         who = m.group('who')
+        self.levels[who].append((0, epoch))
         self.player[m.group('nick')] = who
         # Defaults for level, itemsum, alignment are fine
         self[who]['online'] = True
@@ -256,6 +258,7 @@ class IdlerpgStats(defaultdict):
       if m:
         who = m.group('who')
         self[who]['level'] = int(m.group('level'))
+        self.levels[who].append((m.group('level'), epoch))
         self.handle_timeleft(m, epoch)
         continue
 
@@ -620,6 +623,26 @@ def print_recent(iterable):
   for who in sorted(acount, key=lambda x:acount[x], reverse=True):
     print "{:5d} {}".format(acount[who], who)
 
+def plot_levels(rpgstats):
+  import matplotlib.pyplot as plt
+  import numpy as np
+
+  plt.figure()
+  folks = [x for x in rpgstats.levels.keys() if rpgstats[x]['online'] and rpgstats[x]['level'] > 60]
+  for who in folks: # ('elijah',): #
+    level,when = zip(*rpgstats.levels[who])
+    plt.plot(when,level)
+  xmin, xmax = plt.xlim()
+  xvalues = np.arange(xmin, xmax+1, (xmax-xmin)/10)
+  xlabels = [datetime.fromtimestamp(x).date().isoformat() for x in xvalues]
+  plt.xticks( xvalues, xlabels, rotation=90 )
+  plt.tight_layout()
+  plt.legend(folks, loc='upper left')
+  plt.autoscale('tight')
+  plt.ylim(ymin=50)
+
+  plt.show()
+
 def print_next_levelling(stats):
   def basic_time_to_level(level):
     return 600*1.16**min(level,60) + 86400*max(level-60, 0)
@@ -677,5 +700,7 @@ elif args.show == 'recent':
   print_recent(rpgstats.recent['hogs'])
 elif args.show == 'levelling':
   print_next_levelling(rpgstats)
+elif args.show == 'plot_levelling':
+  plot_levels(rpgstats)
 else:
   raise SystemExit("Unrecognized --show flag: "+args.show)
