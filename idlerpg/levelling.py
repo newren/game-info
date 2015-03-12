@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from collections import defaultdict, deque, Counter
 import argparse
 import math
+import operator
 import re
 import subprocess
 import time
@@ -28,7 +29,7 @@ def convert_to_duration(days, hours, mins, secs):
 
 def default_player():
   return {'level':0, 'timeleft':0, 'itemsum':0, 'alignment':'neutral',
-          'online':None, 'last_logbreak_seen':0}
+          'online':None, 'stronline':'no', 'last_logbreak_seen':0}
 
 class IdlerpgStats(defaultdict):
   def __init__(self, max_recent_count = 100):
@@ -360,6 +361,8 @@ class IdlerpgStats(defaultdict):
       if self[who]['online'] is None and \
          self[who]['timeleft']+self[who]['last_logbreak_seen'] < now:
         self[who]['online'] = False
+      self[who]['stronline'] = 'yes' if self[who]['online'] else (
+                               '???' if self[who]['online'] is None else 'no')
 
 
   def parse(self, fileobj):
@@ -555,6 +558,8 @@ def get_burn_rates(stats, who):
   return burn_rate + quest_default_br, burn_rate + quest_tweaked_br, antiburn
 
 def expected_ttl(stats, who): # How much time-to-level decrease in next day
+  if 'expected_ttls' in stats[who]:
+    return stats[who]['expected_ttls']
   cur_ttl = stats[who]['timeleft']
 
   optimal_burn_rate, expected_burn_rate, antiburn = get_burn_rates(stats, who)
@@ -568,9 +573,8 @@ def print_summary_info(rpgstats):
   brkln="--- --- ---- ------------ ---- ------------ ------------ ---------"
   print "Lvl On? ISum  Time-to-Lvl Algn   Optimistic Expected TTL character"
   last = True
-  for who in sorted(rpgstats, key=lambda x:(rpgstats[x]['online'],rpgstats[x]['timeleft'])):
-    on = 'yes' if rpgstats[who]['online'] else ('???'
-               if rpgstats[who]['online'] is None else 'no')
+  for who in sorted(rpgstats, key=lambda x:(rpgstats[x]['stronline'],rpgstats[x]['timeleft'])):
+    on = rpgstats[who]['stronline']
     assumed_on = bool(on=='yes')
     if assumed_on ^ last:
       print brkln
@@ -587,18 +591,25 @@ def print_summary_info(rpgstats):
              who))
   print("Quest: "+quest_info(rpgstats))
 
+def compute_burn_info(rpgstats, who):
+  bb = battle_burn(rpgstats, who)
+  gchb = godsend_calamity_hog_burn(rpgstats, who)
+  ab = alignment_burn(rpgstats, who)
+  qbdef, qbtweak, antiburn = quest_burn(rpgstats, who)
+  combdef = bb+gchb+ab+qbdef
+  combtweak = bb+gchb+ab+qbtweak
+  critrate = critical_strike_rate(rpgstats,who)
+  return (bb, gchb, ab, qbdef, combdef, qbtweak, combtweak, antiburn/86400, critrate)
+
 def print_detailed_burn_info(rpgstats):
   print "Battle g/c/hog align  quest Comb'd    qmod Comb'd  Xburn CritS  Character"
   print "------ ------ ------ ------ ------  ------ ------  ----- -----  ---------"
   for who in sorted(rpgstats, key=lambda x:rpgstats[x]['itemsum']):
-    bb = battle_burn(rpgstats, who)
-    gchb = godsend_calamity_hog_burn(rpgstats, who)
-    ab = alignment_burn(rpgstats, who)
-    qbdef, qbtweak, antiburn = quest_burn(rpgstats, who)
-    combdef = bb+gchb+ab+qbdef
-    combtweak = bb+gchb+ab+qbtweak
-    critrate = critical_strike_rate(rpgstats,who)
-    print '{:6.3f} {:6.3f} {:6.3f} {:6.3f} {:6.3f}  {:6.3f} {:6.3f}  {:5.2f} {:5.3f}  {}'.format(bb,gchb,ab,qbdef,combdef,qbtweak,combtweak,antiburn/86400,critrate,who)
+    if 'burnrates' in rpgstats[who]:
+      burnrates = rpgstats[who]['burnrates']
+    else:
+      burnrates = compute_burn_info(rpgstats, who)
+    print '{:6.3f} {:6.3f} {:6.3f} {:6.3f} {:6.3f}  {:6.3f} {:6.3f}  {:5.2f} {:5.3f}  '.format(*burnrates)+who
 
 def print_recent(iterable):
   # Print out recent battlers and counts
@@ -679,6 +690,21 @@ def parse_args(rpgstats, irclog):
     stats.parse(log)
     ensure_parsed.count += 1
 
+  comparisons = []
+  def copy_for_comparison(stats):
+    def default_player_copy():
+      basic_dict = default_player()
+      basic_dict['burnrates'] = (0,0,0,0,0,0,0,0,0)
+      basic_dict['expected_ttls'] = (0,0)
+      return basic_dict
+    mycopy = defaultdict(default_player_copy)
+    for who in stats:
+      mycopy[who] = stats[who].copy()
+    for who in stats:
+      mycopy[who]['expected_ttls'] = expected_ttl(stats, who)
+      mycopy[who]['burnrates'] = compute_burn_info(stats, who)
+    comparisons.append(mycopy)
+
   class ParseEndTime(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
       global now
@@ -688,6 +714,12 @@ def parse_args(rpgstats, irclog):
     def __call__(self, parser, namespace, values, option_string=None):
       ensure_parsed(rpgstats, irclog)
       rpgstats.apply_attribute_modifications(values)
+  class RecordForComparison(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+      num_compares = getattr(namespace, self.dest)+1
+      setattr(namespace, self.dest, num_compares)
+      ensure_parsed(rpgstats, irclog, count=num_compares)
+      copy_for_comparison(rpgstats)
 
   parser = argparse.ArgumentParser(description='Frobnicate the unobtanium')
   parser.add_argument('--until', type=str, action=ParseEndTime,
@@ -698,8 +730,36 @@ def parse_args(rpgstats, irclog):
                       choices=['summary', 'burninfo', 'recent', 'levelling',
                                'plot_levelling', 'bad'],
                       help='Which kind of info to show')
+  parser.add_argument('--compare', action=RecordForComparison,
+                      default=0, nargs=0,
+                      help='Record stats for comparison')
   args = parser.parse_args()
   ensure_parsed(rpgstats, irclog)
+  if len(comparisons) > 2:
+    raise SystemExit("Error: Can only meaningfully handle two --compare flags")
+  elif len(comparisons) == 2:
+    for who in rpgstats:
+      rpgstats[who]['level']    = comparisons[1][who]['level'] - \
+                                  comparisons[0][who]['level']
+      rpgstats[who]['timeleft'] = comparisons[1][who]['timeleft'] - \
+                                  comparisons[0][who]['timeleft']
+      rpgstats[who]['itemsum']  = comparisons[1][who]['itemsum'] - \
+                                  comparisons[0][who]['itemsum']
+      rpgstats[who]['expected_ttls'] = tuple(operator.sub(*x) for x in
+                                zip(comparisons[1][who]['expected_ttls'],
+                                    comparisons[0][who]['expected_ttls']))
+      rpgstats[who]['burnrates'] = tuple(operator.sub(*x) for x in
+                                zip(comparisons[1][who]['burnrates'],
+                                    comparisons[0][who]['burnrates']))
+      if comparisons[1][who]['alignment'] != comparisons[0][who]['alignment']:
+        rpgstats[who]['alignment'] = comparisons[0][who]['alignment'][0] + \
+                              '->' + comparisons[1][who]['alignment'][0]
+      if comparisons[1][who]['stronline'] != comparisons[0][who]['stronline']:
+        rpgstats[who]['stronline'] = comparisons[0][who]['stronline'][0] + \
+                                     '>' + \
+                                     comparisons[1][who]['stronline'][0]
+  else:
+    pass # Don't need to do anything special
   return args.show
 
 
