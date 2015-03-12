@@ -17,23 +17,8 @@ import re
 import subprocess
 import time
 
-now = time.time()  # Yeah, yeah, globals are bad.  *shrug*
-
-def parse_args():
-  global now
-  parser = argparse.ArgumentParser(description='Frobnicate the unobtanium')
-  parser.add_argument('--until', type=str,
-                      help='Get state of channel until this specified time (default: now)')
-  parser.add_argument('--whatif', type=str, action='append', default=[],
-                      help='Changes; comma-sep-userlist[:attribN:valueN]*')
-  parser.add_argument('--show', type=str, default='summary',
-                      choices=['summary', 'burninfo', 'recent', 'levelling',
-                               'plot_levelling', 'bad'],
-                      help='Which kind of info to show')
-  args = parser.parse_args()
-  if args.until:
-    now = convert_to_epoch(args.until)
-  return args
+current_time = time.time()  # Yeah, yeah, globals are bad.  *shrug*
+now = current_time
 
 def convert_to_epoch(timestring):
   timetuple = datetime.strptime(timestring, '%Y-%m-%d %H:%M:%S').timetuple()
@@ -682,25 +667,58 @@ def print_next_levelling(stats):
     timestr = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(cur))
     print("{} {:3d} {}".format(timestr, stats[who_adv]['level'], who_adv))
 
-args = parse_args()
+def parse_args(rpgstats, irclog):
+  # A few helper functions for calling rpgstats.parse(irclog) and keeping
+  # track of whether and how many times we have done so.
+  def ensure_parsed(stats, log, count=1):
+    if ensure_parsed.count < count:
+      stats.parse(log)
+      ensure_parsed.count += 1
+  ensure_parsed.count = 0
+  def force_parse(stats, log):
+    stats.parse(log)
+    ensure_parsed.count += 1
+
+  class ParseEndTime(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+      global now
+      now = current_time if values == 'now' else convert_to_epoch(values)
+      force_parse(rpgstats, irclog)
+  class TweakStats(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+      ensure_parsed(rpgstats, irclog)
+      rpgstats.apply_attribute_modifications(values)
+
+  parser = argparse.ArgumentParser(description='Frobnicate the unobtanium')
+  parser.add_argument('--until', type=str, action=ParseEndTime,
+                      help='Get state of channel until this specified time (default: now)')
+  parser.add_argument('--whatif', type=str, action=TweakStats,
+                      help='Changes; comma-sep-userlist[:attribN:valueN]*')
+  parser.add_argument('--show', type=str, default='summary',
+                      choices=['summary', 'burninfo', 'recent', 'levelling',
+                               'plot_levelling', 'bad'],
+                      help='Which kind of info to show')
+  args = parser.parse_args()
+  ensure_parsed(rpgstats, irclog)
+  return args.show
+
+
 rpgstats = IdlerpgStats(40)
 with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
-  rpgstats.parse(f)
-for whatif in args.whatif:
-  rpgstats.apply_attribute_modifications(whatif)
-if args.show == 'summary':
+  show = parse_args(rpgstats, f)
+if show == 'summary':
   print_summary_info(rpgstats)
-elif args.show == 'burninfo':
+elif show == 'burninfo':
   print_detailed_burn_info(rpgstats)
-elif args.show == 'recent':
+elif show == 'recent':
   print_recent(rpgstats.recent['attackers'])
   print_recent(rpgstats.recent['questers'])
   print_recent(rpgstats.recent['godsends'])
   print_recent(rpgstats.recent['calamities'])
   print_recent(rpgstats.recent['hogs'])
-elif args.show == 'levelling':
+elif show == 'levelling':
   print_next_levelling(rpgstats)
-elif args.show == 'plot_levelling':
+elif show == 'plot_levelling':
   plot_levels(rpgstats)
 else:
   raise SystemExit("Unrecognized --show flag: "+args.show)
