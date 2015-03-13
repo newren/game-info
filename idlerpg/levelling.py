@@ -760,25 +760,25 @@ def parse_args(rpgstats, irclog):
                                      comparisons[1][who]['stronline'][0]
   else:
     pass # Don't need to do anything special
-  return args.show
+  return args
 
 
 rpgstats = IdlerpgStats(40)
 with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
-  show = parse_args(rpgstats, f)
-if show == 'summary':
+  args = parse_args(rpgstats, f)
+if args.show == 'summary':
   print_summary_info(rpgstats)
-elif show == 'burninfo':
+elif args.show == 'burninfo':
   print_detailed_burn_info(rpgstats)
-elif show == 'recent':
+elif args.show == 'recent':
   print_recent(rpgstats.recent['attackers'])
   print_recent(rpgstats.recent['questers'])
   print_recent(rpgstats.recent['godsends'])
   print_recent(rpgstats.recent['calamities'])
   print_recent(rpgstats.recent['hogs'])
-elif show == 'levelling':
+elif args.show == 'levelling':
   print_next_levelling(rpgstats)
-elif show == 'plot_levelling':
+elif args.show == 'plot_levelling':
   plot_levels(rpgstats)
 else:
   raise SystemExit("Unrecognized --show flag: "+args.show)
