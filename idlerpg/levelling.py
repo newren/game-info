@@ -678,6 +678,33 @@ def print_next_levelling(stats):
     timestr = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(cur))
     print("{} {:3d} {}".format(timestr, stats[who_adv]['level'], who_adv))
 
+def show_quit_strategy(stats, quitters):
+  penalties = {}
+  for who in stats:
+    if not stats[who]['online']:
+      continue
+    penrate = 16 if who == quitters[0] else 15
+    mult = 0.75 if who in quitters else 1
+    penalty = min(penrate*1.14**stats[who]['level'], 7*86400)
+    br1, br2, ab = get_burn_rates(stats, who)
+
+    ettl_finish_opt = solve_ttl_to_0(mult*stats[who]['timeleft'], br1, 0)
+    ettl_quit_opt = solve_ttl_to_0(penalty+stats[who]['timeleft'], br1, 0)
+
+    ettl_finish_exp = solve_ttl_to_0(mult*stats[who]['timeleft'], br2, ab)
+    ettl_quit_exp = solve_ttl_to_0(penalty+stats[who]['timeleft'], br2, ab)
+    penalties[who] = (ettl_quit_opt-ettl_finish_opt,
+                      ettl_quit_exp-ettl_finish_exp)
+
+  print "Lvl XtraOptimstc XtraExpected character"
+  print "--- ------------ ------------ ---------"
+  for who in sorted(penalties, key=lambda x:penalties[x][1]):
+    print('{:3d} {} {} {}'.format(
+             stats[who]['level'],
+             time_format(penalties[who][0]),
+             time_format(penalties[who][1]),
+             who))
+
 def parse_args(rpgstats, irclog):
   # A few helper functions for calling rpgstats.parse(irclog) and keeping
   # track of whether and how many times we have done so.
@@ -730,11 +757,23 @@ def parse_args(rpgstats, irclog):
                       choices=['summary', 'burninfo', 'recent', 'levelling',
                                'plot_levelling'],
                       help='Which kind of info to show')
+  parser.add_argument('--quit-strategy', type=str, nargs='?', const='',
+                      metavar='QUITTER(S)',
+                      help='Show how much everyone will be set back if a quest'
+                           ' is quit right now.  Comma-separated QUITTER(s) '
+                           'lose out on 25%% bonus.  quitter1 gets p16 instead '
+                           'of p15.  Current questers assumed if none specifed,'
+                           ' but none get the p16 penalty.')
   parser.add_argument('--compare', action=RecordForComparison,
                       default=0, nargs=0,
                       help='Record stats for comparison')
   args = parser.parse_args()
   ensure_parsed(rpgstats, irclog)
+  if args.quit_strategy is not None:
+    args.show = 'quit-strategy'
+    if not args.quit_strategy:
+      questers = IdlerpgStats.get_people_list(rpgstats.questers)
+      args.quit_strategy = ','+','.join(questers)
   if len(comparisons) > 2:
     raise SystemExit("Error: Can only meaningfully handle two --compare flags")
   elif len(comparisons) == 2:
@@ -780,5 +819,7 @@ elif args.show == 'levelling':
   print_next_levelling(rpgstats)
 elif args.show == 'plot_levelling':
   plot_levels(rpgstats)
+elif args.show == 'quit-strategy':
+  show_quit_strategy(rpgstats, args.quit_strategy.split(','))
 else:
   raise SystemExit("Unrecognized --show flag: "+args.show)
