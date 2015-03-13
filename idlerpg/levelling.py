@@ -373,7 +373,7 @@ class IdlerpgStats(defaultdict):
     self.update_offline()
 
 def time_format(seconds):
-  if seconds == float('inf'):
+  if math.isinf(seconds) or math.isnan(seconds):
     seconds = 86400*100-1  # 100 days - 1 second, basically infinity
     #return "     Never  "
   sign = '-' if seconds<0 else ' '
