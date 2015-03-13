@@ -728,7 +728,7 @@ def parse_args(rpgstats, irclog):
                       help='Changes; comma-sep-userlist[:attribN:valueN]*')
   parser.add_argument('--show', type=str, default='summary',
                       choices=['summary', 'burninfo', 'recent', 'levelling',
-                               'plot_levelling', 'bad'],
+                               'plot_levelling'],
                       help='Which kind of info to show')
   parser.add_argument('--compare', action=RecordForComparison,
                       default=0, nargs=0,
