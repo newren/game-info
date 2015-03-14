@@ -535,6 +535,14 @@ def solve_ttl_to_0(ttl, r, p):
   # Switch back to seconds
   return ttl_burn_time * 86400
 
+def solve_for_flat_slope(ttl, r, p):
+  # ttl,p in seconds; burn_rate in days; get common units
+  ttl /= 86400.0
+  p /= 86400.0
+
+  # Do the computation, convert back to seconds, and return it
+  return (p-1)/r * 86400
+
 def advance_by_time(original_ttl, r, p, time_advance):
   # ttl,p,time_advance in seconds; burn_rate in days; get common units
   original_ttl /= 86400.0
@@ -705,6 +713,24 @@ def show_quit_strategy(stats, quitters):
              time_format(penalties[who][1]),
              who))
 
+def show_flat_slopes(stats):
+  penalties = {}
+  print "Lvl FlatOptimstc FlatExpected character"
+  print "--- ------------ ------------ ---------"
+  for who in sorted(stats, key=lambda x:stats[x]['level']):
+    #if not stats[who]['online']:
+    #  continue
+    br1, br2, ab = get_burn_rates(stats, who)
+
+    flat_ttl_opt = solve_for_flat_slope(stats[who]['timeleft'], br1, 0)
+    flat_ttl_exp = solve_for_flat_slope(stats[who]['timeleft'], br2, ab)
+
+    print('{:3d} {} {} {}'.format(
+             stats[who]['level'],
+             time_format(flat_ttl_opt),
+             time_format(flat_ttl_exp),
+             who))
+
 def parse_args(rpgstats, irclog):
   # A few helper functions for calling rpgstats.parse(irclog) and keeping
   # track of whether and how many times we have done so.
@@ -755,7 +781,7 @@ def parse_args(rpgstats, irclog):
                       help='Changes; comma-sep-userlist[:attribN:valueN]*')
   parser.add_argument('--show', type=str, default='summary',
                       choices=['summary', 'burninfo', 'recent', 'levelling',
-                               'plot_levelling'],
+                               'plot_levelling', 'flat_slopes'],
                       help='Which kind of info to show')
   parser.add_argument('--quit-strategy', type=str, nargs='?', const='',
                       metavar='QUITTER(S)',
@@ -821,5 +847,7 @@ elif args.show == 'plot_levelling':
   plot_levels(rpgstats)
 elif args.show == 'quit-strategy':
   show_quit_strategy(rpgstats, args.quit_strategy.split(','))
+elif args.show == 'flat_slopes':
+  show_flat_slopes(rpgstats)
 else:
   raise SystemExit("Unrecognized --show flag: "+args.show)
