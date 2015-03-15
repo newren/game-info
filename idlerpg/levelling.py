@@ -761,7 +761,11 @@ def parse_args(rpgstats, irclog):
   class ParseEndTime(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
       global now
-      now = current_time if values == 'now' else convert_to_epoch(values)
+      new_time = current_time if values == 'now' else convert_to_epoch(values)
+      for who in rpgstats:
+        if rpgstats[who]['online']:
+          rpgstats[who]['timeleft'] -= (new_time-now)
+      now = new_time
       force_parse(rpgstats, irclog)
   class TweakStats(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
