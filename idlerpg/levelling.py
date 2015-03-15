@@ -29,7 +29,8 @@ def convert_to_duration(days, hours, mins, secs):
 
 def default_player():
   return {'level':0, 'timeleft':0, 'itemsum':0, 'alignment':'neutral',
-          'online':None, 'stronline':'no', 'last_logbreak_seen':0}
+          'online':None, 'stronline':'no', 'last_logbreak_seen':0,
+          'attack_stats':[0,0,0]}
 
 class IdlerpgStats(defaultdict):
   def __init__(self, max_recent_count = 100):
@@ -76,6 +77,8 @@ class IdlerpgStats(defaultdict):
 
   @staticmethod
   def get_people_list(wholist):
+    if not wholist:
+      return []
     people = re.findall('[^, ]+', wholist)
     people.remove('and')
     return people
@@ -115,6 +118,7 @@ class IdlerpgStats(defaultdict):
       yield line
 
   def parse_lines(self, f):
+    last_leveller = None
     nextlvl_re="[Nn]ext level in (?P<days>\d+) days?, (?P<hours>\d{2}):(?P<mins>\d{2}):(?P<secs>\d{2})"
     for line in self.next_lines(f):
       #
@@ -243,6 +247,7 @@ class IdlerpgStats(defaultdict):
       m = re.match(r"(?P<who>.*), the .*, has attained level (?P<level>\d+)! "+nextlvl_re, line)
       if m:
         who = m.group('who')
+        last_leveller = who
         self[who]['level'] = int(m.group('level'))
         self.levels[who].append((m.group('level'), epoch))
         self.handle_timeleft(m, epoch)
@@ -271,16 +276,29 @@ class IdlerpgStats(defaultdict):
       #
 
       # Two individuals battling, either due to time (1/hour) or space (grid)
-      m = re.match(r"(?P<attacker>.*) \[\d+/(?P<attacker_sum>\d+)\] has (?:challenged|come upon) (?P<defender>.*) \[\d+/(?P<defender_sum>\d+)\]", line)
+      m = re.match(r"(?P<attacker>.*) \[\d+/(?P<attacker_sum>\d+)\] has (?P<battle_type>challenged|come upon) (?P<defender>.*) \[\d+/(?P<defender_sum>\d+)\]", line)
       if m:
-        attacker, attacker_sum, defender, defender_sum = m.groups()
+        attacker, attacker_sum, battle_type, defender, defender_sum = m.groups()
         self.recent['attackers'].append(attacker)
-        if attacker != 'idlerpg':
-          self[attacker]['itemsum'] = int(attacker_sum)
-          self[attacker]['online'] = True
         if defender != 'idlerpg':
           self[defender]['itemsum'] = int(defender_sum)
           self[defender]['online'] = True
+        if attacker != 'idlerpg':
+          self[attacker]['itemsum'] = int(attacker_sum)
+          self[attacker]['online'] = True
+          if attacker != last_leveller:
+            if battle_type == 'challenged':
+              possibles = [x for x in self
+                           if self[x]['online'] and self[x]['level'] >= 45]
+            elif battle_type == 'come upon':
+              questers = IdlerpgStats.get_people_list(self.questers)
+              possibles = [x for x in self if self[x]['online']
+                                           and x not in questers]
+            for x in possibles:
+              self[x]['attack_stats'][0] += 1.0/len(possibles)
+              self[x]['attack_stats'][1] += 1
+            self[attacker]['attack_stats'][2] += 1
+          last_leveller = None
         continue
 
       #
@@ -627,6 +645,26 @@ def print_recent(iterable):
   for who in sorted(acount, key=lambda x:acount[x], reverse=True):
     print "{:5d} {}".format(acount[who], who)
 
+def print_recent_attacker_stats(stats):
+  print "Battle statistics: number of times as attacker"
+  print "actual  mean  stddev #stdevs character"
+  print "------ ------ ------ ------- ---------"
+  statinfo = {}
+  for who in sorted(stats, key=lambda x:stats[x]['level']):
+    # Assume Binomial distribution.  Granted, number of people online and at
+    # or above level 45 changes slightly with time making this inexact, but
+    # the mean is still correct and we can get an "average" probability p by
+    # dividing Np by N, and then just use that.
+    Np, N, actual = stats[who]['attack_stats']
+    p = Np/N if N != 0 else 0
+    mean = Np
+    sd = math.sqrt(Np*(1-p)) # stddev, for binomial distribution
+    # Compute how many stddevs the actual is away from mean
+    Nsds = (actual-mean)/sd if sd > 0 else 0
+    statinfo[who] = (actual, mean, sd, Nsds)
+  for who in sorted(statinfo, key=lambda x:statinfo[x][3]):
+    print "{:6d} {:6.2f} {:6.2f} {:7.3f} ".format(*statinfo[who]) + who
+
 def plot_levels(rpgstats):
   import matplotlib.pyplot as plt
   import numpy as np
@@ -753,6 +791,7 @@ def parse_args(rpgstats, irclog):
     mycopy = defaultdict(default_player_copy)
     for who in stats:
       mycopy[who] = stats[who].copy()
+      mycopy[who]['attack_stats'] = stats[who]['attack_stats'][:]
     for who in stats:
       mycopy[who]['expected_ttls'] = expected_ttl(stats, who)
       mycopy[who]['burnrates'] = compute_burn_info(stats, who)
@@ -814,6 +853,9 @@ def parse_args(rpgstats, irclog):
                                   comparisons[0][who]['timeleft']
       rpgstats[who]['itemsum']  = comparisons[1][who]['itemsum'] - \
                                   comparisons[0][who]['itemsum']
+      rpgstats[who]['attack_stats'] = list(operator.sub(*x) for x in
+                                zip(comparisons[1][who]['attack_stats'],
+                                    comparisons[0][who]['attack_stats']))
       rpgstats[who]['expected_ttls'] = tuple(operator.sub(*x) for x in
                                 zip(comparisons[1][who]['expected_ttls'],
                                     comparisons[0][who]['expected_ttls']))
@@ -845,6 +887,7 @@ elif args.show == 'recent':
   print_recent(rpgstats.recent['godsends'])
   print_recent(rpgstats.recent['calamities'])
   print_recent(rpgstats.recent['hogs'])
+  print_recent_attacker_stats(rpgstats)
 elif args.show == 'levelling':
   print_next_levelling(rpgstats)
 elif args.show == 'plot_levelling':
