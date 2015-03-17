@@ -101,14 +101,15 @@ class IdlerpgStats(defaultdict):
       for i in xrange(1,len(what),2):
         attrib,value = what[i],what[i+1]
         try:
-          value = int(value)
-        except ValueError:
+          value = eval(value)  # Security schmecurity
+        except NameError: # Happens when value is 'good' or 'evil' w/o quotes
           pass
         for who in userlist:
           if attrib == 'alignment':
             rpgstats.change_alignment(who, value)
           else:
             rpgstats[who][attrib] = value
+      self.update_offline()
 
   def next_lines(self, f):
     if self.last_line:
