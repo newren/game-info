@@ -843,7 +843,15 @@ def parse_args(rpgstats, irclog):
     args.show = 'quit-strategy'
     if not args.quit_strategy:
       questers = IdlerpgStats.get_people_list(rpgstats.questers)
-      args.quit_strategy = ','+','.join(questers)
+      priority_quitters = ('elijah','Atychiphobe')
+      for person in priority_quitters:
+        if person in questers:
+          questers.remove(person)
+          questers.insert(0,person)
+          break
+      args.quit_strategy = ','.join(questers)
+      if not any(x in questers for x in priority_quitters):
+        args.quit_strategy = ','+args.quit_strategy
   if len(comparisons) > 2:
     raise SystemExit("Error: Can only meaningfully handle two --compare flags")
   elif len(comparisons) == 2:
