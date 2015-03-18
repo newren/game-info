@@ -48,7 +48,7 @@ class IdlerpgStats(defaultdict):
     self.quest_times = []
     self.quest_started = None
     self.quest_time_left = None
-    self.questers = None
+    self.questers = []
     self.next_quest = 0
     self.last_line = None
     self.levels = defaultdict(list)
@@ -98,9 +98,33 @@ class IdlerpgStats(defaultdict):
     people.remove('and')
     return people
 
-  def reward_questers(self, quest_end, questers_string):
-    for who in IdlerpgStats.get_people_list(questers_string):
-      self.adjust_timeleft_percentage(who, quest_end, 25)
+  def record_questers(self, questers, epoch):
+    # Record the quest beginning
+    self.questers = questers
+    self.quest_started = epoch
+
+    # Make sure folks are recorded as online
+    for who in questers:
+      self.ensure_online(who, epoch)
+      self.recent['questers'].append(who)
+
+  def quest_ended(self, quest_end, successful):
+    # Reward for a successful quest
+    if successful:
+      wait_period = 21600  # 6 hours
+      for who in self.questers:
+        self.adjust_timeleft_percentage(who, quest_end, 25)
+    # Or penalty for an unsuccessful one
+    else:
+      wait_period = 43200  # 12 hours
+      for p in self:
+        if self[p]['online']:
+          self[p]['timeleft'] += 15*1.14**self[p]['level']
+    # Record that there is no active quest
+    self.quest_started = None
+    self.quest_time_left = None
+    self.questers = []
+    self.next_quest = quest_end+wait_period
 
   def change_alignment(self, who, align, epoch):
     if self[who]['alignment'] == align:
@@ -189,21 +213,14 @@ class IdlerpgStats(defaultdict):
       #
       m = re.match("(.*) have been chosen.*Participants must first reach", line)
       if m:
-        self.questers = m.group(1)
-        self.quest_started = epoch
-        for who in IdlerpgStats.get_people_list(self.questers):
-          self.ensure_online(who, epoch)
-          self.recent['questers'].append(who)
+        self.record_questers(IdlerpgStats.get_people_list(m.group(1)), epoch)
         continue
       m = re.match(r"(.*) have been chosen.*Quest to end in (\d+) days?, (\d{2}):(\d{2}):(\d{2})", line)
       if m:
-        self.questers, days, hours, mins, secs = m.groups()
-        self.quest_started = epoch
+        quester_list, days, hours, mins, secs = m.groups()
+        self.record_questers(IdlerpgStats.get_people_list(quester_list), epoch)
         duration = convert_to_duration(days, hours, mins, secs)
         self.quest_time_left = self.quest_started+duration-now
-        for who in IdlerpgStats.get_people_list(self.questers):
-          self.ensure_online(who, epoch)
-          self.recent['questers'].append(who)
         continue
 
       #
@@ -211,30 +228,16 @@ class IdlerpgStats(defaultdict):
       #
       m = re.match(r".*prudence and self-regard has brought the wrath of the gods upon the realm", line)
       if m:
-        self.quest_started = None
-        self.quest_time_left = None
-        self.questers = None
-        self.next_quest = epoch+43200
-        for p in self:
-          if self[p]['online']:
-            self[p]['timeleft'] += 15*1.14**self[p]['level']
+        self.quest_ended(epoch, successful=False)
         continue
       m = re.match(r".*completed their journey", line)
       if m:
         self.quest_times.append(epoch-self.quest_started)
-        self.reward_questers(epoch, self.questers)
-        self.quest_started = None
-        self.quest_time_left = None
-        self.questers = None
-        self.next_quest = epoch+21600
+        self.quest_ended(epoch, successful=True)
         continue
       m = re.match(r".*have blessed the realm by completing their quest", line)
       if m:
-        self.reward_questers(epoch, self.questers)
-        self.quest_started = None
-        self.quest_time_left = None
-        self.questers = None
-        self.next_quest = epoch+21600
+        self.quest_ended(epoch, successful=True)
         continue
 
       #
@@ -306,9 +309,8 @@ class IdlerpgStats(defaultdict):
               possibles = [x for x in self
                            if self[x]['online'] and self[x]['level'] >= 45]
             elif battle_type == 'come upon':
-              questers = IdlerpgStats.get_people_list(self.questers)
               possibles = [x for x in self if self[x]['online']
-                                           and x not in questers]
+                                           and x not in self.questers]
             for x in possibles:
               self[x]['attack_stats'][0] += 1.0/len(possibles)
               self[x]['attack_stats'][1] += 1
@@ -439,13 +441,13 @@ def quest_info(stats):
   if stats.quest_started:
     if stats.quest_time_left: # Time-based quest
       return "Will end in "+time_format(stats.quest_time_left)+\
-             "; Participants: "+stats.questers
+             "; Participants: "+','.join(stats.questers)
     else:
       import numpy
       early = time_format(stats.quest_started+numpy.min(stats.quest_times)-now)
       likly = time_format(stats.quest_started+numpy.mean(stats.quest_times)-now)
       return "May end in {}; most likely to end in {}".format(early, likly)+\
-             "\nParticipants: "+stats.questers
+             "\nParticipants: "+','.join(stats.questers)
   else:
     next_start = time_format(stats.next_quest-now)
     return "None; next should start in "+next_start
@@ -912,7 +914,7 @@ def parse_args(rpgstats, irclog):
   if args.quit_strategy is not None:
     args.show = 'quit-strategy'
     if not args.quit_strategy:
-      questers = IdlerpgStats.get_people_list(rpgstats.questers)
+      questers = rpgstats.questers[:]
       priority_quitters = ('elijah','Atychiphobe')
       for person in priority_quitters:
         if person in questers:
