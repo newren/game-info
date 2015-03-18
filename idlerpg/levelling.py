@@ -859,7 +859,9 @@ def parse_args(rpgstats, irclog):
     mycopy = defaultdict(default_player_copy)
     for who in stats:
       mycopy[who] = stats[who].copy()
-      mycopy[who]['attack_stats'] = stats[who]['attack_stats'][:]
+      mycopy[who]['attack_stats']     = stats[who]['attack_stats'][:]
+      mycopy[who]['total_time_stats'] = stats[who]['total_time_stats'][:]
+      mycopy[who]['alignment_stats']  = stats[who]['alignment_stats'][:]
     for who in stats:
       mycopy[who]['expected_ttls'] = expected_ttl(stats, who)
       mycopy[who]['burnrates'] = compute_burn_info(stats, who)
@@ -869,10 +871,11 @@ def parse_args(rpgstats, irclog):
     def __call__(self, parser, namespace, values, option_string=None):
       global now
       new_time = current_time if values == 'now' else convert_to_epoch(values)
+      old_time, now = now, new_time
       for who in rpgstats:
         if rpgstats[who]['online']:
-          rpgstats[who]['timeleft'] -= (new_time-now)
-      now = new_time
+          rpgstats[who]['timeleft'] -= (new_time-old_time)
+          rpgstats.adjust_total_time_by_alignment(who, old_time, increase=True)
       force_parse(rpgstats, irclog)
   class TweakStats(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
@@ -932,6 +935,12 @@ def parse_args(rpgstats, irclog):
       rpgstats[who]['attack_stats'] = list(operator.sub(*x) for x in
                                 zip(comparisons[1][who]['attack_stats'],
                                     comparisons[0][who]['attack_stats']))
+      rpgstats[who]['total_time_stats'] = list(operator.sub(*x) for x in
+                                zip(comparisons[1][who]['total_time_stats'],
+                                    comparisons[0][who]['total_time_stats']))
+      rpgstats[who]['alignment_stats'] = list(operator.sub(*x) for x in
+                                zip(comparisons[1][who]['alignment_stats'],
+                                    comparisons[0][who]['alignment_stats']))
       rpgstats[who]['expected_ttls'] = tuple(operator.sub(*x) for x in
                                 zip(comparisons[1][who]['expected_ttls'],
                                     comparisons[0][who]['expected_ttls']))
