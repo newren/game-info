@@ -327,6 +327,17 @@ class IdlerpgStats(defaultdict):
         self.change_alignment(who, align, epoch)
         continue
 
+      # X stole Y's level \d+ .* while they were sleeping!...
+      m = re.match(r"(?P<who>.*) stole (?P<victim>.*)'s level (?P<newlvl>\d+) (?P<item>.*) while they were sleeping! .* leaves their old level (?P<oldlvl>\d+) .* behind, which .* then takes.", line)
+      if m:
+        thief, victim, newlvl, item, oldlvl = m.groups()
+        change = int(newlvl)-int(oldlvl)
+        self.change_alignment(thief,  'evil', epoch)
+        self.change_alignment(victim, 'good', epoch)
+        factor = {'good':1.1, 'neutral':1.0, 'evil':0.9}
+        self[thief]['itemsum']  += factor[self[thief]['alignment']] *change
+        self[victim]['itemsum'] -= factor[self[victim]['alignment']]*change
+
       #
       # Check for godsends, calamities, and hogs
       #
