@@ -697,8 +697,8 @@ def print_recent_attacker_stats(stats):
 
 def print_recent_alignment_stats(stats):
   print "Alignment statistics: number of times benefit from alignment"
-  print "prayed  mean  stddev #stdevs 4saken  mean  stddev #stdevs steals #stdevs character"
-  print "------ ------ ------ ------- ------ ------ ------ ------- ------ ------- ---------"
+  print "pray mean stddev #stdevs 4sak mean stddev #stdevs stls #stdevs character"
+  print "---- ---- ------ ------- ---- ---- ------ ------- ---- ------- ---------"
   statinfo = {}
   for who in sorted(stats, key=lambda x:stats[x]['level']):
     #print who, stats[who]['alignment_stats'], stats[who]['total_time_stats']
@@ -731,7 +731,7 @@ def print_recent_alignment_stats(stats):
                      evil_forsake_count, mean_evil, std_evil, Nsds_forsake,
                      evil_steal_count,   Nsds_steal)
   for who in sorted(statinfo, key=lambda x:statinfo[x][3]):
-    print "{:6d} {:6.2f} {:6.2f} {:7.3f} {:6d} {:6.2f} {:6.2f} {:7.3f} {:6d} {:7.3f} ".format(*statinfo[who]) + who
+    print "{:4d} {:4.1f} {:6.2f} {:7.3f} {:4d} {:4.1f} {:6.2f} {:7.3f} {:4d} {:7.3f} ".format(*statinfo[who]) + who
 
 def plot_levels(rpgstats):
   import matplotlib.pyplot as plt
