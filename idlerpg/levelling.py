@@ -695,6 +695,44 @@ def print_recent_attacker_stats(stats):
   for who in sorted(statinfo, key=lambda x:statinfo[x][3]):
     print "{:6d} {:6.2f} {:6.2f} {:7.3f} ".format(*statinfo[who]) + who
 
+def print_recent_alignment_stats(stats):
+  print "Alignment statistics: number of times benefit from alignment"
+  print "prayed  mean  stddev #stdevs 4saken  mean  stddev #stdevs steals #stdevs character"
+  print "------ ------ ------ ------- ------ ------ ------ ------- ------ ------- ---------"
+  statinfo = {}
+  for who in sorted(stats, key=lambda x:stats[x]['level']):
+    #print who, stats[who]['alignment_stats'], stats[who]['total_time_stats']
+
+    # Assume Binomial distribution.  Granted, number of people online and at
+    # or above level 45 changes slightly with time making this inexact, but
+    # the mean is still correct and we can get an "average" probability p by
+    # dividing Np by N, and then just use that.
+    good_bless_count, evil_forsake_count, evil_steal_count = \
+      stats[who]['alignment_stats']
+    time_online_good, time_online_neutral, time_online_evil = \
+      stats[who]['total_time_stats']
+
+    mean_good = 2*time_online_good/86400.0/12 # Twice every 12 days
+    mean_evil = time_online_evil/86400.0/16 # 1/16 days for both forsake,steal
+
+    # Since these are checked every self_clock seconds, these binomial
+    # distributions are close enough to the poisson distribution limit
+    # that we'll just round off and treat it as the latter for the
+    # stddev calculations.
+    std_good = math.sqrt(mean_good)
+    std_evil = math.sqrt(mean_evil)
+
+    # Compute how many stddevs the actual is away from mean
+    Nsds_good    = (good_bless_count  -mean_good)/std_good if std_good>0 else 0
+    Nsds_forsake = (evil_forsake_count-mean_evil)/std_evil if std_evil>0 else 0
+    Nsds_steal   = (evil_steal_count  -mean_evil)/std_evil if std_evil>0 else 0
+
+    statinfo[who] = (good_bless_count,   mean_good, std_good, Nsds_good,
+                     evil_forsake_count, mean_evil, std_evil, Nsds_forsake,
+                     evil_steal_count,   Nsds_steal)
+  for who in sorted(statinfo, key=lambda x:statinfo[x][3]):
+    print "{:6d} {:6.2f} {:6.2f} {:7.3f} {:6d} {:6.2f} {:6.2f} {:7.3f} {:6d} {:7.3f} ".format(*statinfo[who]) + who
+
 def plot_levels(rpgstats):
   import matplotlib.pyplot as plt
   import numpy as np
@@ -926,6 +964,7 @@ elif args.show == 'recent':
   print_recent(rpgstats.recent['calamities'])
   print_recent(rpgstats.recent['hogs'])
   print_recent_attacker_stats(rpgstats)
+  print_recent_alignment_stats(rpgstats)
 elif args.show == 'levelling':
   print_next_levelling(rpgstats)
 elif args.show == 'plot_levelling':
