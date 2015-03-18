@@ -31,7 +31,7 @@ def default_player():
   return {'level':0, 'timeleft':0, 'itemsum':0, 'alignment':'neutral',
           'online':None, 'stronline':'no', 'last_logbreak_seen':0,
           'attack_stats':[0,0,0],
-          'total_time_stats':[0,0,0]
+          'total_time_stats':[0,0,0], 'alignment_stats':[0,0,0]
 }
 
 class IdlerpgStats(defaultdict):
@@ -334,6 +334,7 @@ class IdlerpgStats(defaultdict):
         change = int(newlvl)-int(oldlvl)
         self.change_alignment(thief,  'evil', epoch)
         self.change_alignment(victim, 'good', epoch)
+        self[thief]['alignment_stats'][2] += 1
         factor = {'good':1.1, 'neutral':1.0, 'evil':0.9}
         self[thief]['itemsum']  += factor[self[thief]['alignment']] *change
         self[victim]['itemsum'] -= factor[self[victim]['alignment']]*change
@@ -377,6 +378,7 @@ class IdlerpgStats(defaultdict):
         duration = convert_to_duration(days, hours, mins, secs)
         self[who]['timeleft'] += duration
         self.change_alignment(who, 'evil', epoch)
+        self[who]['alignment_stats'][1] += 1
 
       # X and Y have not let the iniquities of evil men.*them.  \d+% of their time
       m = re.match(r'(.*?) and (.*?) have not let the iniquities of evil men.*them.*(\d+)% of their time is removed from their clocks', line)
@@ -386,6 +388,8 @@ class IdlerpgStats(defaultdict):
         self.adjust_timeleft_percentage(who2, epoch, int(percentage))
         self.change_alignment(who1, 'good', epoch)
         self.change_alignment(who2, 'good', epoch)
+        self[who1]['alignment_stats'][0] += 1
+        self[who2]['alignment_stats'][0] += 1
 
       # I, J, and K [.*] have team battled.* and (won|lost)!
       m = re.match(r'(.*?)\[.*?have team battled .*? and (won|lost)! (\d+) days?, (\d{2}):(\d{2}):(\d{2})', line)
