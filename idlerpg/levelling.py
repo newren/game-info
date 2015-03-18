@@ -92,12 +92,14 @@ class IdlerpgStats(defaultdict):
     for who in IdlerpgStats.get_people_list(questers_string):
       self.adjust_timeleft_percentage(who, quest_end, 25)
 
-  def change_alignment(self, who, align):
+  def change_alignment(self, who, align, epoch):
+    if self[who]['alignment'] == align:
+      return
     factor = {'good':1.1, 'neutral':1.0, 'evil':0.9}
     self[who]['alignment'], old = align, self[who]['alignment']
     self[who]['itemsum'] = int(self[who]['itemsum']*factor[align]/factor[old])
 
-  def apply_attribute_modifications(self, attrib_list_changes):
+  def apply_attribute_modifications(self, attrib_list_changes, epoch):
     if attrib_list_changes:
       what = attrib_list_changes.split(':')
       if len(what)%2 != 1:
@@ -111,7 +113,7 @@ class IdlerpgStats(defaultdict):
           pass
         for who in userlist:
           if attrib == 'alignment':
-            rpgstats.change_alignment(who, value)
+            rpgstats.change_alignment(who, value, epoch)
           else:
             rpgstats[who][attrib] = value
       self.update_offline()
@@ -310,7 +312,7 @@ class IdlerpgStats(defaultdict):
       m = re.match(r"(?P<who>.*) has changed alignment to: (.*)\.$", line)
       if m:
         who, align = m.groups()
-        self.change_alignment(who, align)
+        self.change_alignment(who, align, epoch)
         continue
 
       #
@@ -351,7 +353,7 @@ class IdlerpgStats(defaultdict):
         who, days, hours, mins, secs = m.groups()
         duration = convert_to_duration(days, hours, mins, secs)
         self[who]['timeleft'] += duration
-        self[who]['alignment'] = 'evil'
+        self.change_alignment(who, 'evil', epoch)
 
       # X and Y have not let the iniquities of evil men.*them.  \d+% of their time
       m = re.match(r'(.*?) and (.*?) have not let the iniquities of evil men.*them.*(\d+)% of their time is removed from their clocks', line)
@@ -359,8 +361,8 @@ class IdlerpgStats(defaultdict):
         who1, who2, percentage = m.groups()
         self.adjust_timeleft_percentage(who1, epoch, int(percentage))
         self.adjust_timeleft_percentage(who2, epoch, int(percentage))
-        self[who1]['alignment'] = 'good'
-        self[who2]['alignment'] = 'good'
+        self.change_alignment(who1, 'good', epoch)
+        self.change_alignment(who2, 'good', epoch)
 
       # I, J, and K [.*] have team battled.* and (won|lost)!
       m = re.match(r'(.*?)\[.*?have team battled .*? and (won|lost)! (\d+) days?, (\d{2}):(\d{2}):(\d{2})', line)
@@ -810,7 +812,7 @@ def parse_args(rpgstats, irclog):
   class TweakStats(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
       ensure_parsed(rpgstats, irclog)
-      rpgstats.apply_attribute_modifications(values)
+      rpgstats.apply_attribute_modifications(values, now)
   class RecordForComparison(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
       num_compares = getattr(namespace, self.dest)+1
