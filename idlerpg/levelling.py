@@ -65,10 +65,15 @@ class IdlerpgStats(defaultdict):
     now_delta = (epoch+post_delta)-now
 
     self[who]['timeleft'] = now_delta
+    self.ensure_online(who, epoch)
 
-  def stop_timeleft_as_of(self, who, post_epoch):
+  def ensure_offline(self, who, epoch, known_offline=True):
     if self[who]['online']:
-      self[who]['timeleft'] += (now-post_epoch)
+      self[who]['timeleft'] += (now-epoch)
+    self[who]['online'] = (False if known_offline else None)
+
+  def ensure_online(self, who, epoch):
+    self[who]['online'] = True
 
   def adjust_timeleft_percentage(self, who, post_epoch, percentage):
     then_diff = (now-post_epoch)
@@ -135,10 +140,9 @@ class IdlerpgStats(defaultdict):
           break
         who = self.player.get(nick)
         if who in self:
-          self.stop_timeleft_as_of(who, post_epoch)
           if self[who]['online']:
             self[who]['timeleft'] += 20*1.14**self[who]['level']
-          self[who]['online'] = False
+          self.ensure_offline(who, post_epoch, known_offline=True)
         continue
 
       # I got disconnected somehow
@@ -150,10 +154,9 @@ class IdlerpgStats(defaultdict):
         if post_epoch > now:
           break
         for who in self:
-          self.stop_timeleft_as_of(who, post_epoch)
           if self[who]['online'] != None:
             self[who]['last_logbreak_seen'] = post_epoch
-          self[who]['online'] = None
+          self.ensure_offline(who, post_epoch, known_offline=False)
         continue
 
       #
@@ -175,7 +178,7 @@ class IdlerpgStats(defaultdict):
         self.questers = m.group(1)
         self.quest_started = epoch
         for who in IdlerpgStats.get_people_list(self.questers):
-          self[who]['online'] = True
+          self.ensure_online(who, epoch)
           self.recent['questers'].append(who)
         continue
       m = re.match(r"(.*) have been chosen.*Quest to end in (\d+) days?, (\d{2}):(\d{2}):(\d{2})", line)
@@ -185,7 +188,7 @@ class IdlerpgStats(defaultdict):
         duration = convert_to_duration(days, hours, mins, secs)
         self.quest_time_left = self.quest_started+duration-now
         for who in IdlerpgStats.get_people_list(self.questers):
-          self[who]['online'] = True
+          self.ensure_online(who, epoch)
           self.recent['questers'].append(who)
         continue
 
@@ -232,7 +235,6 @@ class IdlerpgStats(defaultdict):
         self.levels[who].append((0, epoch))
         self.player[m.group('nick')] = who
         # Defaults for level, itemsum, alignment are fine
-        self[who]['online'] = True
         continue
 
       # Y, the level W Z, is now online from nickname X. Next level in...
@@ -240,7 +242,6 @@ class IdlerpgStats(defaultdict):
       if m:
         who = m.group('who')
         self.player[m.group('nick')] = who
-        self[who]['online'] = True
         self.handle_timeleft(m, epoch)
         continue
 
@@ -261,7 +262,6 @@ class IdlerpgStats(defaultdict):
       #   other cases like Critical Strikes or light of their God or hand of God.
       m = re.match(r"(?P<who>.*) reaches "+nextlvl_re, line)
       if m:
-        self[m.group('who')]['online'] = True
         self.handle_timeleft(m, epoch)
         continue
 
@@ -283,10 +283,10 @@ class IdlerpgStats(defaultdict):
         self.recent['attackers'].append(attacker)
         if defender != 'idlerpg':
           self[defender]['itemsum'] = int(defender_sum)
-          self[defender]['online'] = True
+          self.ensure_online(defender, epoch)
         if attacker != 'idlerpg':
           self[attacker]['itemsum'] = int(attacker_sum)
-          self[attacker]['online'] = True
+          self.ensure_online(attacker, epoch)
           if attacker != last_leveller:
             if battle_type == 'challenged':
               possibles = [x for x in self
