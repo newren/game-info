@@ -354,7 +354,7 @@ class IdlerpgStats(defaultdict):
         self[who]['alignment'] = 'evil'
 
       # X and Y have not let the iniquities of evil men.*them.  \d+% of their time
-      m = re.match(r'(.*?) and (.*?) have not let the iniquities of evil men.*them. (\d+)% of their time is removed from their clocks', line)
+      m = re.match(r'(.*?) and (.*?) have not let the iniquities of evil men.*them.*(\d+)% of their time is removed from their clocks', line)
       if m:
         who1, who2, percentage = m.groups()
         self.adjust_timeleft_percentage(who1, epoch, int(percentage))
