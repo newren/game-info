@@ -30,7 +30,7 @@ def convert_to_duration(days, hours, mins, secs):
 def default_player():
   return {'level':0, 'timeleft':0, 'itemsum':0, 'alignment':'neutral',
           'online':None, 'stronline':'no', 'last_logbreak_seen':0,
-          'attack_stats':[0,0,0],
+          'attack_stats':[0,0,0], 'quest_stats':[0,0,0],
           'total_time_stats':[0,0,0], 'alignment_stats':[0,0,0]
 }
 
@@ -107,6 +107,16 @@ class IdlerpgStats(defaultdict):
     for who in questers:
       self.ensure_online(who, epoch)
       self.recent['questers'].append(who)
+
+    # Record stats related to quests
+    # FIXME should also verify user has been online for 10 hours
+    possibles = [x for x in self
+                 if self[x]['online'] and self[x]['level'] >= 40]
+    for x in possibles:
+      self[x]['quest_stats'][0] += 4.0/len(possibles)
+      self[x]['quest_stats'][1] += 1
+    for x in questers:
+      self[x]['quest_stats'][2] += 1
 
   def quest_ended(self, quest_end, successful):
     # Reward for a successful quest
@@ -677,23 +687,36 @@ def print_recent(iterable):
   for who in sorted(acount, key=lambda x:acount[x], reverse=True):
     print "{:5d} {}".format(acount[who], who)
 
-def print_recent_attacker_stats(stats):
-  print "Battle statistics: number of times as attacker"
-  print "actual  mean  stddev #stdevs character"
-  print "------ ------ ------ ------- ---------"
+def compute_recent_stats(stats, stat_type):
   statinfo = {}
   for who in sorted(stats, key=lambda x:stats[x]['level']):
-    # Assume Binomial distribution.  Granted, number of people online and at
-    # or above level 45 changes slightly with time making this inexact, but
-    # the mean is still correct and we can get an "average" probability p by
-    # dividing Np by N, and then just use that.
-    Np, N, actual = stats[who]['attack_stats']
+    # Assume Binomial distribution.  Granted, number of people online and
+    # eligible (e.g. above level 45, above 40 and online for 10 hours, etc.)
+    # changes slightly with time making this inexact, but the mean is still
+    # correct and we can get an "average" probability p by dividing Np by N,
+    # and just assume this average p was constant for a rough approximation.
+    Np, N, actual = stats[who][stat_type]
     p = Np/N if N != 0 else 0
     mean = Np
     sd = math.sqrt(Np*(1-p)) # stddev, for binomial distribution
     # Compute how many stddevs the actual is away from mean
     Nsds = (actual-mean)/sd if sd > 0 else 0
     statinfo[who] = (actual, mean, sd, Nsds)
+  return statinfo
+
+def print_recent_attacker_stats(stats):
+  statinfo = compute_recent_stats(stats, 'attack_stats')
+  print "Battle statistics: number of times as attacker"
+  print "actual  mean  stddev #stdevs character"
+  print "------ ------ ------ ------- ---------"
+  for who in sorted(statinfo, key=lambda x:statinfo[x][3]):
+    print "{:6d} {:6.2f} {:6.2f} {:7.3f} ".format(*statinfo[who]) + who
+
+def print_recent_quester_stats(stats):
+  statinfo = compute_recent_stats(stats, 'quest_stats')
+  print "Quest statistics: number of times as quester"
+  print "actual  mean  stddev #stdevs character"
+  print "------ ------ ------ ------- ---------"
   for who in sorted(statinfo, key=lambda x:statinfo[x][3]):
     print "{:6d} {:6.2f} {:6.2f} {:7.3f} ".format(*statinfo[who]) + who
 
@@ -862,6 +885,7 @@ def parse_args(rpgstats, irclog):
     for who in stats:
       mycopy[who] = stats[who].copy()
       mycopy[who]['attack_stats']     = stats[who]['attack_stats'][:]
+      mycopy[who]['quest_stats']      = stats[who]['quest_stats'][:]
       mycopy[who]['total_time_stats'] = stats[who]['total_time_stats'][:]
       mycopy[who]['alignment_stats']  = stats[who]['alignment_stats'][:]
     for who in stats:
@@ -937,6 +961,9 @@ def parse_args(rpgstats, irclog):
       rpgstats[who]['attack_stats'] = list(operator.sub(*x) for x in
                                 zip(comparisons[1][who]['attack_stats'],
                                     comparisons[0][who]['attack_stats']))
+      rpgstats[who]['quest_stats'] = list(operator.sub(*x) for x in
+                                zip(comparisons[1][who]['quest_stats'],
+                                    comparisons[0][who]['quest_stats']))
       rpgstats[who]['total_time_stats'] = list(operator.sub(*x) for x in
                                 zip(comparisons[1][who]['total_time_stats'],
                                     comparisons[0][who]['total_time_stats']))
@@ -975,6 +1002,7 @@ elif args.show == 'recent':
   print_recent(rpgstats.recent['calamities'])
   print_recent(rpgstats.recent['hogs'])
   print_recent_attacker_stats(rpgstats)
+  print_recent_quester_stats(rpgstats)
   print_recent_alignment_stats(rpgstats)
 elif args.show == 'levelling':
   print_next_levelling(rpgstats)
