@@ -30,7 +30,9 @@ def convert_to_duration(days, hours, mins, secs):
 def default_player():
   return {'level':0, 'timeleft':0, 'itemsum':0, 'alignment':'neutral',
           'online':None, 'stronline':'no', 'last_logbreak_seen':0,
-          'attack_stats':[0,0,0]}
+          'attack_stats':[0,0,0],
+          'total_time_stats':[0,0,0]
+}
 
 class IdlerpgStats(defaultdict):
   def __init__(self, max_recent_count = 100):
@@ -67,12 +69,20 @@ class IdlerpgStats(defaultdict):
     self[who]['timeleft'] = now_delta
     self.ensure_online(who, epoch)
 
+  def adjust_total_time_by_alignment(self, who, epoch, increase):
+    factor = 1 if increase else -1
+    index = {'good':0, 'neutral':1, 'evil':2}[self[who]['alignment']]
+    self[who]['total_time_stats'][index] += factor*(now-epoch)
+
   def ensure_offline(self, who, epoch, known_offline=True):
     if self[who]['online']:
       self[who]['timeleft'] += (now-epoch)
+      self.adjust_total_time_by_alignment(who, epoch, increase=False)
     self[who]['online'] = (False if known_offline else None)
 
   def ensure_online(self, who, epoch):
+    if not self[who]['online']:
+      self.adjust_total_time_by_alignment(who, epoch, increase=True)
     self[who]['online'] = True
 
   def adjust_timeleft_percentage(self, who, post_epoch, percentage):
@@ -96,8 +106,10 @@ class IdlerpgStats(defaultdict):
     if self[who]['alignment'] == align:
       return
     factor = {'good':1.1, 'neutral':1.0, 'evil':0.9}
+    self.adjust_total_time_by_alignment(who, epoch, increase=False)
     self[who]['alignment'], old = align, self[who]['alignment']
     self[who]['itemsum'] = int(self[who]['itemsum']*factor[align]/factor[old])
+    self.adjust_total_time_by_alignment(who, epoch, increase=True)
 
   def apply_attribute_modifications(self, attrib_list_changes, epoch):
     if attrib_list_changes:
