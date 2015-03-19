@@ -843,6 +843,11 @@ def show_quit_strategy(stats, quitters):
              time_format(penalties[who][0]),
              time_format(penalties[who][1]),
              who))
+  if stats.questers:
+    best = sum(1.0 for x in stats.quest_times
+               if stats.quest_started+x-now < stats['elijah']['timeleft'])
+    odds = best/len(stats.quest_times)
+    print("Odds of quest completion before elijah levels: {}%".format(100*odds))
 
 def show_flat_slopes(stats):
   penalties = {}
