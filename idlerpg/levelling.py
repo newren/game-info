@@ -514,7 +514,7 @@ def critical_strike_rate(stats,who):
     if opp == who or not stats[opp]['online']:
       continue
     odds_fight_this_opp = 1.0/oncount # oncount-1 other players, plus idlerpg
-    odds_beaten_by_opp = stats[opp]['itemsum']/(stats[who]['itemsum']+stats[opp]['itemsum']+0.0)
+    odds_beaten_by_opp = stats[opp]['itemsum']/(stats[who]['itemsum']+stats[opp]['itemsum']+1e-25)
 
     odds_lose = odds_fight_per_day*odds_fight_this_opp*odds_beaten_by_opp
     rate += odds_lose * crit_factor[stats[opp]['alignment']] * 15.0/100
