@@ -1,3 +1,8 @@
+Determining whether my strategies are working:
+  ./levelling.py --until '2015-02-16 21:07:07' --compare --until now --compare
+  # Check who has levelled the most, ignoring low-level characters, with ttl
+  # adjustments being a good backup.  As of 03-13, j & kniktas were leading me
+
 Determining what battle-adjusted itemsums folks have used over time:
    cat ~/.xchat2/xchatlogs/Palantir-#idlerpg.log | grep -v 'team battled' | grep -o '[A-Za-z0-9]* \[[0-9/]*\]' | sort -k 1,1 -s | sed -e s#[0-9]*/## | uniq -c | less
 
