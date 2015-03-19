@@ -31,8 +31,9 @@ def default_player():
   return {'level':0, 'timeleft':0, 'itemsum':0, 'alignment':'neutral',
           'online':None, 'stronline':'no', 'last_logbreak_seen':0,
           'attack_stats':[0,0,0], 'quest_stats':[0,0,0],
-          'total_time_stats':[0,0,0], 'alignment_stats':[0,0,0]
-}
+          'total_time_stats':[0,0,0], 'alignment_stats':[0,0,0],
+          'gch_stats':[0,0,0,0,0]
+         }
 
 class IdlerpgStats(defaultdict):
   def __init__(self, max_recent_count = 100):
@@ -354,28 +355,34 @@ class IdlerpgStats(defaultdict):
       #
       # Check for godsends, calamities, and hogs
       #
-      m = re.match('(?P<who>\w+).*gains 10% of its effectiveness', line)
+      m = re.match(r".*! (?P<who>\w+)'s.*gains 10% effectiveness", line)
       if m:
+        self[m.group('who')]['gch_stats'][0] += 1
         self.recent['godsends'].append(m.group('who'))
         continue
       m = re.match('(?P<who>\w+).*wondrous godsend has accelerated', line)
       if m:
+        self[m.group('who')]['gch_stats'][1] += 1
         self.recent['godsends'].append(m.group('who'))
         continue
       m = re.match('(?P<who>\w+).*loses 10% of its effectiveness', line)
       if m:
+        self[m.group('who')]['gch_stats'][2] += 1
         self.recent['calamities'].append(m.group('who'))
         continue
       m = re.match('(?P<who>\w+).*terrible calamity has slowed them', line)
       if m:
+        self[m.group('who')]['gch_stats'][3] += 1
         self.recent['calamities'].append(m.group('who'))
         continue
       m = re.match('.*hand of God carried (?P<who>\w+).*toward level', line)
       if m:
+        self[m.group('who')]['gch_stats'][4] += 1
         self.recent['hogs'].append(m.group('who'))
         continue
       m = re.match('Thereupon.*consumed (?P<who>\w+) with fire, slowing', line)
       if m:
+        self[m.group('who')]['gch_stats'][4] += 1
         self.recent['hogs'].append(m.group('who'))
         continue
 
@@ -720,6 +727,31 @@ def print_recent_quester_stats(stats):
   for who in sorted(statinfo, key=lambda x:statinfo[x][3]):
     print "{:6d} {:6.2f} {:6.2f} {:7.3f} ".format(*statinfo[who]) + who
 
+def print_recent_gch_stats(stats, idx, typestr, times_per_day):
+  print "statistics: number of times received "+typestr
+  print "count mean stddev #stdevs character"
+  print "----- ---- ------ ------- ---------"
+  statinfo = {}
+  for who in stats:
+    count = stats[who]['gch_stats'][idx]
+    total_time_online = sum(stats[who]['total_time_stats'])
+
+    mean = total_time_online/86400.0 * times_per_day
+
+    # Since these are checked every self_clock seconds, these binomial
+    # distributions are close enough to the poisson distribution limit
+    # that we'll just round off and treat it as the latter for the
+    # stddev calculations.
+    stddev = math.sqrt(mean)
+
+    # Compute how many stddevs the actual is away from mean
+    Nsds = (count-mean)/stddev if stddev>0 else 0
+
+    statinfo[who] = (count, mean, stddev, Nsds)
+
+  for who in sorted(statinfo, key=lambda x:statinfo[x][3]):
+    print "{:5d} {:4.1f} {:6.2f} {:7.3f} ".format(*statinfo[who]) + who
+
 def print_recent_alignment_stats(stats):
   print "Alignment statistics: number of times benefit from alignment"
   print "pray mean stddev #stdevs 4sak mean stddev #stdevs stls #stdevs character"
@@ -893,6 +925,7 @@ def parse_args(rpgstats, irclog):
       mycopy[who]['quest_stats']      = stats[who]['quest_stats'][:]
       mycopy[who]['total_time_stats'] = stats[who]['total_time_stats'][:]
       mycopy[who]['alignment_stats']  = stats[who]['alignment_stats'][:]
+      mycopy[who]['gch_stats']        = stats[who]['gch_stats'][:]
     for who in stats:
       mycopy[who]['expected_ttls'] = expected_ttl(stats, who)
       mycopy[who]['burnrates'] = compute_burn_info(stats, who)
@@ -975,6 +1008,9 @@ def parse_args(rpgstats, irclog):
       rpgstats[who]['alignment_stats'] = list(operator.sub(*x) for x in
                                 zip(comparisons[1][who]['alignment_stats'],
                                     comparisons[0][who]['alignment_stats']))
+      rpgstats[who]['gch_stats'] = list(operator.sub(*x) for x in
+                                zip(comparisons[1][who]['gch_stats'],
+                                    comparisons[0][who]['gch_stats']))
       rpgstats[who]['expected_ttls'] = tuple(operator.sub(*x) for x in
                                 zip(comparisons[1][who]['expected_ttls'],
                                     comparisons[0][who]['expected_ttls']))
@@ -1009,6 +1045,11 @@ elif args.show == 'recent':
   print_recent_attacker_stats(rpgstats)
   print_recent_quester_stats(rpgstats)
   print_recent_alignment_stats(rpgstats)
+  print_recent_gch_stats(rpgstats, 0, "item improvement godsends",    1.0/40)
+  print_recent_gch_stats(rpgstats, 1, "time acceleration godsends",   9.0/40)
+  print_recent_gch_stats(rpgstats, 2, "item detriment calamities",    1.0/80)
+  print_recent_gch_stats(rpgstats, 3, "time deceleration calamities", 9.0/80)
+  print_recent_gch_stats(rpgstats, 4, "hands of god",                 1.0/20)
 elif args.show == 'levelling':
   print_next_levelling(rpgstats)
 elif args.show == 'plot_levelling':
