@@ -766,6 +766,25 @@ def print_alignment_stats(stats, idx, typestr, times_per_day):
     if statinfo[who][1] != 0:
       print "{:5d} {:4.1f} {:6.2f} {:7.3f} ".format(*statinfo[who]) + who
 
+def print_personal_stats(stats, who):
+  print "personal statistics: "+who
+  print "type          count  mean stddev #stdevs character"
+  print "------------- ----- ----- ------ ------- ---------"
+  def print_info(stat_type, statinfo):
+    print "{:<13s}".format(stat_type),
+    print "{:5d} {:5.1f} {:6.2f} {:7.3f} ".format(*statinfo[who]) + who
+
+  print_info('Attacker', compute_basic_stats(stats, 'attack_stats', [who]))
+  print_info('Quests', compute_basic_stats(stats, 'quest_stats', [who]))
+  print_info('Light Shining', compute_alignment_stats(stats, 0, 2.0/12, [who]))
+  print_info('Forsakings', compute_alignment_stats(stats, 1, 1.0/16, [who]))
+  print_info('Stealings', compute_alignment_stats(stats, 2, 1.0/16, [who]))
+  print_info('Godsend-item', compute_gch_stats(stats, 0, 1.0/40, [who]))
+  print_info('Godsend-time', compute_gch_stats(stats, 1, 9.0/40, [who]))
+  print_info('Calamity-item', compute_gch_stats(stats, 2, 1.0/80, [who]))
+  print_info('Calamity-time', compute_gch_stats(stats, 3, 9.0/80, [who]))
+  print_info('Hand of God', compute_gch_stats(stats, 4, 1.0/20, [who]))
+
 def plot_levels(rpgstats):
   import matplotlib.pyplot as plt
   import numpy as np
@@ -948,6 +967,8 @@ def parse_args(rpgstats, irclog):
                                'calamity-item', 'calamity-time',
                                'hand-of-god'],
                       help='Show cumulative stats vs. expected results')
+  output.add_argument('--stats-of', type=str,
+                      help='Show all stats of specific individual')
   output.add_argument('--quit-strategy', type=str, nargs='?', const='',
                       metavar='QUITTER(S)',
                       help='Show how much everyone will be set back if a quest'
@@ -957,7 +978,7 @@ def parse_args(rpgstats, irclog):
                            ' but none get the p16 penalty.')
   args = parser.parse_args()
   ensure_parsed(rpgstats, irclog)
-  if args.stats:
+  if args.stats or args.stats_of:
     args.show = None
   if args.quit_strategy is not None:
     args.show = 'quit-strategy'
@@ -1042,6 +1063,8 @@ elif args.stats == 'calamity-time':
   print_gch_stats(rpgstats, 3, "time deceleration calamities", 9.0/80)
 elif args.stats == 'hand-of-god':
   print_gch_stats(rpgstats, 4, "hands of god",                 1.0/20)
+elif args.stats_of:
+  print_personal_stats(rpgstats, args.stats_of)
 elif args.show == 'levelling':
   print_next_levelling(rpgstats)
 elif args.show == 'plot_levelling':
