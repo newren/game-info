@@ -706,9 +706,6 @@ def print_quest_stats(stats):
     print "{:6d} {:6.2f} {:6.2f} {:7.3f} ".format(*statinfo[who]) + who
 
 def print_gch_stats(stats, idx, typestr, times_per_day):
-  print "statistics: number of times received "+typestr
-  print "count mean stddev #stdevs character"
-  print "----- ---- ------ ------- ---------"
   statinfo = {}
   for who in stats:
     count = stats[who]['gch_stats'][idx]
@@ -727,13 +724,13 @@ def print_gch_stats(stats, idx, typestr, times_per_day):
 
     statinfo[who] = (count, mean, stddev, Nsds)
 
+  print "statistics: number of times received "+typestr
+  print "count mean stddev #stdevs character"
+  print "----- ---- ------ ------- ---------"
   for who in sorted(statinfo, key=lambda x:statinfo[x][3]):
     print "{:5d} {:4.1f} {:6.2f} {:7.3f} ".format(*statinfo[who]) + who
 
 def print_alignment_stats(stats):
-  print "Alignment statistics: number of times benefit from alignment"
-  print "pray mean stddev #stdevs 4sak mean stddev #stdevs stls #stdevs character"
-  print "---- ---- ------ ------- ---- ---- ------ ------- ---- ------- ---------"
   statinfo = {}
   for who in sorted(stats, key=lambda x:stats[x]['level']):
     #print who, stats[who]['alignment_stats'], stats[who]['total_time_stats']
@@ -765,6 +762,10 @@ def print_alignment_stats(stats):
     statinfo[who] = (good_bless_count,   mean_good, std_good, Nsds_good,
                      evil_forsake_count, mean_evil, std_evil, Nsds_forsake,
                      evil_steal_count,   Nsds_steal)
+
+  print "Alignment statistics: number of times benefit from alignment"
+  print "pray mean stddev #stdevs 4sak mean stddev #stdevs stls #stdevs character"
+  print "---- ---- ------ ------- ---- ---- ------ ------- ---- ------- ---------"
   for who in sorted(statinfo, key=lambda x:statinfo[x][3]):
     print "{:4d} {:4.1f} {:6.2f} {:7.3f} {:4d} {:4.1f} {:6.2f} {:7.3f} {:4d} {:7.3f} ".format(*statinfo[who]) + who
 
