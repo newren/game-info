@@ -672,7 +672,7 @@ def print_detailed_burn_info(rpgstats):
       burnrates = compute_burn_info(rpgstats, who)
     print '{:6.3f} {:6.3f} {:6.3f} {:6.3f} {:6.3f}  {:6.3f} {:6.3f}  {:5.2f} {:5.3f}  '.format(*burnrates)+who
 
-def compute_recent_stats(stats, stat_type):
+def compute_basic_stats(stats, stat_type):
   statinfo = {}
   for who in sorted(stats, key=lambda x:stats[x]['level']):
     # Assume Binomial distribution.  Granted, number of people online and
@@ -689,23 +689,23 @@ def compute_recent_stats(stats, stat_type):
     statinfo[who] = (actual, mean, sd, Nsds)
   return statinfo
 
-def print_recent_attacker_stats(stats):
-  statinfo = compute_recent_stats(stats, 'attack_stats')
+def print_attacker_stats(stats):
+  statinfo = compute_basic_stats(stats, 'attack_stats')
   print "Battle statistics: number of times as attacker"
   print "actual  mean  stddev #stdevs character"
   print "------ ------ ------ ------- ---------"
   for who in sorted(statinfo, key=lambda x:statinfo[x][3]):
     print "{:6d} {:6.2f} {:6.2f} {:7.3f} ".format(*statinfo[who]) + who
 
-def print_recent_quester_stats(stats):
-  statinfo = compute_recent_stats(stats, 'quest_stats')
+def print_quest_stats(stats):
+  statinfo = compute_basic_stats(stats, 'quest_stats')
   print "Quest statistics: number of times as quester"
   print "actual  mean  stddev #stdevs character"
   print "------ ------ ------ ------- ---------"
   for who in sorted(statinfo, key=lambda x:statinfo[x][3]):
     print "{:6d} {:6.2f} {:6.2f} {:7.3f} ".format(*statinfo[who]) + who
 
-def print_recent_gch_stats(stats, idx, typestr, times_per_day):
+def print_gch_stats(stats, idx, typestr, times_per_day):
   print "statistics: number of times received "+typestr
   print "count mean stddev #stdevs character"
   print "----- ---- ------ ------- ---------"
@@ -730,7 +730,7 @@ def print_recent_gch_stats(stats, idx, typestr, times_per_day):
   for who in sorted(statinfo, key=lambda x:statinfo[x][3]):
     print "{:5d} {:4.1f} {:6.2f} {:7.3f} ".format(*statinfo[who]) + who
 
-def print_recent_alignment_stats(stats):
+def print_alignment_stats(stats):
   print "Alignment statistics: number of times benefit from alignment"
   print "pray mean stddev #stdevs 4sak mean stddev #stdevs stls #stdevs character"
   print "---- ---- ------ ------- ---- ---- ------ ------- ---- ------- ---------"
@@ -1024,21 +1024,21 @@ if args.show == 'summary':
 elif args.show == 'burninfo':
   print_detailed_burn_info(rpgstats)
 elif args.stats == 'attacker':
-  print_recent_attacker_stats(rpgstats)
+  print_attacker_stats(rpgstats)
 elif args.stats == 'quester':
-  print_recent_quester_stats(rpgstats)
+  print_quester_stats(rpgstats)
 elif args.stats == 'alignment':
-  print_recent_alignment_stats(rpgstats)
+  print_alignment_stats(rpgstats)
 elif args.stats == 'godsend-item':
-  print_recent_gch_stats(rpgstats, 0, "item improvement godsends",    1.0/40)
+  print_gch_stats(rpgstats, 0, "item improvement godsends",    1.0/40)
 elif args.stats == 'godsend-time':
-  print_recent_gch_stats(rpgstats, 1, "time acceleration godsends",   9.0/40)
+  print_gch_stats(rpgstats, 1, "time acceleration godsends",   9.0/40)
 elif args.stats == 'calamity-item':
-  print_recent_gch_stats(rpgstats, 2, "item detriment calamities",    1.0/80)
+  print_gch_stats(rpgstats, 2, "item detriment calamities",    1.0/80)
 elif args.stats == 'calamity-time':
-  print_recent_gch_stats(rpgstats, 3, "time deceleration calamities", 9.0/80)
+  print_gch_stats(rpgstats, 3, "time deceleration calamities", 9.0/80)
 elif args.stats == 'hand-of-god':
-  print_recent_gch_stats(rpgstats, 4, "hands of god",                 1.0/20)
+  print_gch_stats(rpgstats, 4, "hands of god",                 1.0/20)
 elif args.show == 'levelling':
   print_next_levelling(rpgstats)
 elif args.show == 'plot_levelling':
