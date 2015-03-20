@@ -674,9 +674,9 @@ def print_detailed_burn_info(rpgstats):
       burnrates = compute_burn_info(rpgstats, who)
     print '{:6.3f} {:6.3f} {:6.3f} {:6.3f} {:6.3f}  {:6.3f} {:6.3f}  {:5.2f} {:5.3f}  '.format(*burnrates)+who
 
-def compute_basic_stats(stats, stat_type):
+def compute_basic_stats(stats, stat_type, for_whom=None):
   statinfo = {}
-  for who in sorted(stats, key=lambda x:stats[x]['level']):
+  for who in (for_whom or stats):
     # Assume Binomial distribution.  Granted, number of people online and
     # eligible (e.g. above level 45, above 40 and online for 10 hours, etc.)
     # changes slightly with time making this inexact, but the mean is still
@@ -707,9 +707,9 @@ def print_quest_stats(stats):
   for who in sorted(statinfo, key=lambda x:statinfo[x][3]):
     print "{:6d} {:6.2f} {:6.2f} {:7.3f} ".format(*statinfo[who]) + who
 
-def print_gch_stats(stats, idx, typestr, times_per_day):
+def compute_gch_stats(stats, idx, times_per_day, for_whom=None):
   statinfo = {}
-  for who in stats:
+  for who in (for_whom or stats):
     count = stats[who]['gch_stats'][idx]
     total_time_online = sum(stats[who]['total_time_stats'])
 
@@ -725,45 +725,46 @@ def print_gch_stats(stats, idx, typestr, times_per_day):
     Nsds = (count-mean)/stddev if stddev>0 else 0
 
     statinfo[who] = (count, mean, stddev, Nsds)
+  return statinfo
 
+def print_gch_stats(stats, idx, typestr, times_per_day):
+  statinfo = compute_gch_stats(stats, idx, times_per_day)
   print "statistics: number of times received "+typestr
   print "count mean stddev #stdevs character"
   print "----- ---- ------ ------- ---------"
   for who in sorted(statinfo, key=lambda x:statinfo[x][3]):
     print "{:5d} {:4.1f} {:6.2f} {:7.3f} ".format(*statinfo[who]) + who
 
-def print_alignment_stats(stats):
+def compute_alignment_stats(stats, idx, times_per_day, for_whom=None):
   statinfo = {}
-  for who in sorted(stats, key=lambda x:stats[x]['level']):
-    good_bless_count, evil_forsake_count, evil_steal_count = \
-      stats[who]['alignment_stats']
-    time_online_good, time_online_neutral, time_online_evil = \
-      stats[who]['total_time_stats']
+  for who in (for_whom or stats):
+    # alignment stats are: praying_count, forsaken_count, stealing_count
+    # So, relevant time for each of those is: good, evil, evil
+    count = stats[who]['alignment_stats'][idx]
+    online_time = stats[who]['total_time_stats'][idx+idx%2]
 
-    mean_good = 2*time_online_good/86400.0/12 # Twice every 12 days
-    mean_evil = time_online_evil/86400.0/16 # 1/16 days for both forsake,steal
+    mean = online_time/86400.0*times_per_day
 
     # Since these are checked every self_clock seconds, these binomial
     # distributions are close enough to the poisson distribution limit
     # that we'll just round off and treat it as the latter for the
     # stddev calculations.
-    std_good = math.sqrt(mean_good)
-    std_evil = math.sqrt(mean_evil)
+    stddev = math.sqrt(mean)
 
     # Compute how many stddevs the actual is away from mean
-    Nsds_good    = (good_bless_count  -mean_good)/std_good if std_good>0 else 0
-    Nsds_forsake = (evil_forsake_count-mean_evil)/std_evil if std_evil>0 else 0
-    Nsds_steal   = (evil_steal_count  -mean_evil)/std_evil if std_evil>0 else 0
+    Nsds = (count-mean)/stddev if stddev>0 else 0
 
-    statinfo[who] = (good_bless_count,   mean_good, std_good, Nsds_good,
-                     evil_forsake_count, mean_evil, std_evil, Nsds_forsake,
-                     evil_steal_count,   Nsds_steal)
+    statinfo[who] = (count, mean, stddev, Nsds)
+  return statinfo
 
-  print "Alignment statistics: number of times benefit from alignment"
-  print "pray mean stddev #stdevs 4sak mean stddev #stdevs stls #stdevs character"
-  print "---- ---- ------ ------- ---- ---- ------ ------- ---- ------- ---------"
+def print_alignment_stats(stats, idx, typestr, times_per_day):
+  statinfo = compute_alignment_stats(stats, idx, times_per_day)
+  print "alignment statistics: "+typestr
+  print "count mean stddev #stdevs character"
+  print "----- ---- ------ ------- ---------"
   for who in sorted(statinfo, key=lambda x:statinfo[x][3]):
-    print "{:4d} {:4.1f} {:6.2f} {:7.3f} {:4d} {:4.1f} {:6.2f} {:7.3f} {:4d} {:7.3f} ".format(*statinfo[who]) + who
+    if statinfo[who][1] != 0:
+      print "{:5d} {:4.1f} {:6.2f} {:7.3f} ".format(*statinfo[who]) + who
 
 def plot_levels(rpgstats):
   import matplotlib.pyplot as plt
@@ -941,7 +942,8 @@ def parse_args(rpgstats, irclog):
                                'plot_levelling', 'flat_slopes'],
                       help='Which kind of info to show')
   output.add_argument('--stats', type=str,
-                      choices=['attacker', 'quester', 'alignment',
+                      choices=['attacker', 'quester',
+                               'good', 'forsaking', 'stealing',
                                'godsend-item', 'godsend-time',
                                'calamity-item', 'calamity-time',
                                'hand-of-god'],
@@ -1024,8 +1026,12 @@ elif args.stats == 'attacker':
   print_attacker_stats(rpgstats)
 elif args.stats == 'quester':
   print_quester_stats(rpgstats)
-elif args.stats == 'alignment':
-  print_alignment_stats(rpgstats)
+elif args.stats == 'good':
+  print_alignment_stats(rpgstats, 0, 'good', 2.0/12)
+elif args.stats == 'forsaking':
+  print_alignment_stats(rpgstats, 1, 'evil-forsakings', 1.0/16)
+elif args.stats == 'stealing':
+  print_alignment_stats(rpgstats, 2, 'evil-stealings', 1.0/16)
 elif args.stats == 'godsend-item':
   print_gch_stats(rpgstats, 0, "item improvement godsends",    1.0/40)
 elif args.stats == 'godsend-time':
