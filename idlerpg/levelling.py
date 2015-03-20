@@ -8,6 +8,8 @@
 #     which makes it hard to guess the correct data; I can only tell what the
 #     correct data is once logging restarts and messages about each user
 #     come in giving me updated information.
+#   * Quest statistics don't check that players have been online for >= 10 hours
+#   * Stealing counting doesn't check the additional logfiles that it should
 
 from datetime import datetime, timedelta
 from collections import defaultdict, deque, Counter
@@ -733,12 +735,6 @@ def print_gch_stats(stats, idx, typestr, times_per_day):
 def print_alignment_stats(stats):
   statinfo = {}
   for who in sorted(stats, key=lambda x:stats[x]['level']):
-    #print who, stats[who]['alignment_stats'], stats[who]['total_time_stats']
-
-    # Assume Binomial distribution.  Granted, number of people online and at
-    # or above level 45 changes slightly with time making this inexact, but
-    # the mean is still correct and we can get an "average" probability p by
-    # dividing Np by N, and then just use that.
     good_bless_count, evil_forsake_count, evil_steal_count = \
       stats[who]['alignment_stats']
     time_online_good, time_online_neutral, time_online_evil = \
