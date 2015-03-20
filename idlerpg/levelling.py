@@ -36,15 +36,9 @@ def default_player():
          }
 
 class IdlerpgStats(defaultdict):
-  def __init__(self, max_recent_count = 100):
+  def __init__(self):
     super(IdlerpgStats, self).__init__(default_player)
     self.player = {}  # ircnick -> who_string
-    self.recent = {'attackers'  : deque(maxlen=max_recent_count),
-                   'questers'   : deque(maxlen=max_recent_count),
-                   'godsends'   : deque(maxlen=max_recent_count),
-                   'calamities' : deque(maxlen=max_recent_count),
-                   'hogs'       : deque(maxlen=max_recent_count),
-                  }
     self.quest_started = None  # time_string or None
     self.quest_times = []
     self.quest_started = None
@@ -107,7 +101,6 @@ class IdlerpgStats(defaultdict):
     # Make sure folks are recorded as online
     for who in questers:
       self.ensure_online(who, epoch)
-      self.recent['questers'].append(who)
 
     # Record stats related to quests
     # FIXME should also verify user has been online for 10 hours
@@ -308,7 +301,6 @@ class IdlerpgStats(defaultdict):
       m = re.match(r"(?P<attacker>.*) \[\d+/(?P<attacker_sum>\d+)\] has (?P<battle_type>challenged|come upon) (?P<defender>.*) \[\d+/(?P<defender_sum>\d+)\]", line)
       if m:
         attacker, attacker_sum, battle_type, defender, defender_sum = m.groups()
-        self.recent['attackers'].append(attacker)
         if defender != 'idlerpg':
           self[defender]['itemsum'] = int(defender_sum)
           self.ensure_online(defender, epoch)
@@ -358,32 +350,26 @@ class IdlerpgStats(defaultdict):
       m = re.match(r".*! (?P<who>\w+)'s.*gains 10% effectiveness", line)
       if m:
         self[m.group('who')]['gch_stats'][0] += 1
-        self.recent['godsends'].append(m.group('who'))
         continue
       m = re.match('(?P<who>\w+).*wondrous godsend has accelerated', line)
       if m:
         self[m.group('who')]['gch_stats'][1] += 1
-        self.recent['godsends'].append(m.group('who'))
         continue
       m = re.match('(?P<who>\w+).*loses 10% of its effectiveness', line)
       if m:
         self[m.group('who')]['gch_stats'][2] += 1
-        self.recent['calamities'].append(m.group('who'))
         continue
       m = re.match('(?P<who>\w+).*terrible calamity has slowed them', line)
       if m:
         self[m.group('who')]['gch_stats'][3] += 1
-        self.recent['calamities'].append(m.group('who'))
         continue
       m = re.match('.*hand of God carried (?P<who>\w+).*toward level', line)
       if m:
         self[m.group('who')]['gch_stats'][4] += 1
-        self.recent['hogs'].append(m.group('who'))
         continue
       m = re.match('Thereupon.*consumed (?P<who>\w+) with fire, slowing', line)
       if m:
         self[m.group('who')]['gch_stats'][4] += 1
-        self.recent['hogs'].append(m.group('who'))
         continue
 
       #
@@ -686,14 +672,6 @@ def print_detailed_burn_info(rpgstats):
       burnrates = compute_burn_info(rpgstats, who)
     print '{:6.3f} {:6.3f} {:6.3f} {:6.3f} {:6.3f}  {:6.3f} {:6.3f}  {:5.2f} {:5.3f}  '.format(*burnrates)+who
 
-def print_recent(iterable):
-  # Print out recent battlers and counts
-  acount = Counter(iterable)
-  print "Count Individual"
-  print "----- ----------"
-  for who in sorted(acount, key=lambda x:acount[x], reverse=True):
-    print "{:5d} {}".format(acount[who], who)
-
 def compute_recent_stats(stats, stat_type):
   statinfo = {}
   for who in sorted(stats, key=lambda x:stats[x]['level']):
@@ -957,22 +935,31 @@ def parse_args(rpgstats, irclog):
                       help='Get state of channel until this specified time (default: now)')
   parser.add_argument('--whatif', type=str, action=TweakStats,
                       help='Changes; comma-sep-userlist[:attribN:valueN]*')
-  parser.add_argument('--show', type=str, default='summary',
+  parser.add_argument('--compare', action=RecordForComparison,
+                      default=0, nargs=0,
+                      help='Record stats for comparison')
+  output = parser.add_mutually_exclusive_group()
+  output.add_argument('--show', type=str, default='summary',
                       choices=['summary', 'burninfo', 'recent', 'levelling',
                                'plot_levelling', 'flat_slopes'],
                       help='Which kind of info to show')
-  parser.add_argument('--quit-strategy', type=str, nargs='?', const='',
+  output.add_argument('--stats', type=str,
+                      choices=['attacker', 'quester', 'alignment',
+                               'godsend-item', 'godsend-time',
+                               'calamity-item', 'calamity-time',
+                               'hand-of-god'],
+                      help='Show cumulative stats vs. expected results')
+  output.add_argument('--quit-strategy', type=str, nargs='?', const='',
                       metavar='QUITTER(S)',
                       help='Show how much everyone will be set back if a quest'
                            ' is quit right now.  Comma-separated QUITTER(s) '
                            'lose out on 25%% bonus.  quitter1 gets p16 instead '
                            'of p15.  Current questers assumed if none specifed,'
                            ' but none get the p16 penalty.')
-  parser.add_argument('--compare', action=RecordForComparison,
-                      default=0, nargs=0,
-                      help='Record stats for comparison')
   args = parser.parse_args()
   ensure_parsed(rpgstats, irclog)
+  if args.stats:
+    args.show = None
   if args.quit_strategy is not None:
     args.show = 'quit-strategy'
     if not args.quit_strategy:
@@ -1029,26 +1016,28 @@ def parse_args(rpgstats, irclog):
   return args
 
 
-rpgstats = IdlerpgStats(40)
+rpgstats = IdlerpgStats()
 with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
   args = parse_args(rpgstats, f)
 if args.show == 'summary':
   print_summary_info(rpgstats)
 elif args.show == 'burninfo':
   print_detailed_burn_info(rpgstats)
-elif args.show == 'recent':
-  print_recent(rpgstats.recent['attackers'])
-  print_recent(rpgstats.recent['questers'])
-  print_recent(rpgstats.recent['godsends'])
-  print_recent(rpgstats.recent['calamities'])
-  print_recent(rpgstats.recent['hogs'])
+elif args.stats == 'attacker':
   print_recent_attacker_stats(rpgstats)
+elif args.stats == 'quester':
   print_recent_quester_stats(rpgstats)
+elif args.stats == 'alignment':
   print_recent_alignment_stats(rpgstats)
+elif args.stats == 'godsend-item':
   print_recent_gch_stats(rpgstats, 0, "item improvement godsends",    1.0/40)
+elif args.stats == 'godsend-time':
   print_recent_gch_stats(rpgstats, 1, "time acceleration godsends",   9.0/40)
+elif args.stats == 'calamity-item':
   print_recent_gch_stats(rpgstats, 2, "item detriment calamities",    1.0/80)
+elif args.stats == 'calamity-time':
   print_recent_gch_stats(rpgstats, 3, "time deceleration calamities", 9.0/80)
+elif args.stats == 'hand-of-god':
   print_recent_gch_stats(rpgstats, 4, "hands of god",                 1.0/20)
 elif args.show == 'levelling':
   print_next_levelling(rpgstats)
