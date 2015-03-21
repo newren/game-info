@@ -983,30 +983,33 @@ def parse_args(rpgstats, irclog):
       fakeRecordForComparison(parser, namespace, [], '--compare')
 
   parser = argparse.ArgumentParser(description='Frobnicate the unobtanium')
-  parser.add_argument('--until', type=str, action=ParseEndTime,
+  when = parser.add_mutually_exclusive_group()
+  when.add_argument('--since', type=str, action=DoTimeComparison,
+                    help='Get state of channel since this specified time; '
+                      '--since X == --until X --compare --until now --compare')
+  when.add_argument('--until', type=str, action=ParseEndTime,
                       help='Get state of channel until this specified time (default: now)')
-  parser.add_argument('--since', type=str, action=DoTimeComparison,
-                      help='Get state of channel since this specified time')
   parser.add_argument('--whatif', type=str, action=TweakStats,
                       help='Changes; comma-sep-userlist[:attribN:valueN]*')
   parser.add_argument('--compare', action=RecordForComparison,
                       default=0, nargs=0,
-                      help='Record stats for comparison')
-  output = parser.add_mutually_exclusive_group()
-  output.add_argument('--show', type=str, default='summary',
-                      choices=['summary', 'burninfo', 'recent', 'levelling',
+                      help='Record stats for comparison; must be used twice'
+                           ' (with --whatif or --until flags inbetween)')
+  parser.add_argument('--show', action='append', default=[],
+                      choices=['summary', 'burninfo', 'levelling',
                                'plot_levelling', 'flat_slopes'],
                       help='Which kind of info to show')
-  output.add_argument('--stats', type=str,
-                      choices=['attacker', 'quester',
-                               'good', 'forsaking', 'stealing',
+  parser.add_argument('--stats', action='append', default=[],
+                      choices=['attacker', 'quest',
+                               'light-shining', 'forsaking', 'stealing',
                                'godsend-item', 'godsend-time',
                                'calamity-item', 'calamity-time',
                                'hand-of-god'],
                       help='Show cumulative stats vs. expected results')
-  output.add_argument('--stats-of', type=str,
+  parser.add_argument('--stats-of', action='append', default=[],
+                      metavar='PLAYER',
                       help='Show all stats of specific individual')
-  output.add_argument('--quit-strategy', type=str, nargs='?', const='',
+  parser.add_argument('--quit-strategy', type=str, nargs='?', const='',
                       metavar='QUITTER(S)',
                       help='Show how much everyone will be set back if a quest'
                            ' is quit right now.  Comma-separated QUITTER(s) '
@@ -1014,11 +1017,15 @@ def parse_args(rpgstats, irclog):
                            'of p15.  Current questers assumed if none specifed,'
                            ' but none get the p16 penalty.')
   args = parser.parse_args()
+
+  # Make sure the log is parsed
   ensure_parsed(rpgstats, irclog)
-  if args.stats or args.stats_of:
-    args.show = None
+
+  # Sanity checking and specialized defaults
   if args.quit_strategy is not None:
-    args.show = 'quit-strategy'
+    if len(comparisons) > 0:
+      raise SystemExit("Quit strategy is incompatible with comparisons")
+    # Try to be smart about who to select for quitting
     if not args.quit_strategy:
       questers = rpgstats.questers[:]
       priority_quitters = ('elijah','Atychiphobe')
@@ -1030,7 +1037,11 @@ def parse_args(rpgstats, irclog):
       args.quit_strategy = ','.join(questers)
       if not any(x in questers for x in priority_quitters):
         args.quit_strategy = ','+args.quit_strategy
-  if len(comparisons) > 2:
+  if not (args.show or args.stats or args.stats_of or args.quit_strategy):
+    args.show = ['summary']
+
+  # Handle comparisons
+  if len(comparisons) not in (0,2):
     raise SystemExit("Error: Can only meaningfully handle two --compare flags")
   elif len(comparisons) == 2:
     for who in rpgstats:
@@ -1068,47 +1079,45 @@ def parse_args(rpgstats, irclog):
         rpgstats[who]['stronline'] = comparisons[0][who]['stronline'][0] + \
                                      '>' + \
                                      comparisons[1][who]['stronline'][0]
-  else:
-    pass # Don't need to do anything special
+
+  # Okay, we can finally return args
   return args
 
 
 rpgstats = IdlerpgStats()
 with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
   args = parse_args(rpgstats, f)
-if args.show == 'summary':
+if 'summary' in args.show:
   print_summary_info(rpgstats)
-elif args.show == 'burninfo':
+if 'burninfo' in args.show:
   print_detailed_burn_info(rpgstats)
-elif args.stats == 'attacker':
+if 'attacker' in args.stats:
   print_attacker_stats(rpgstats)
-elif args.stats == 'quester':
-  print_quester_stats(rpgstats)
-elif args.stats == 'good':
-  print_alignment_stats(rpgstats, 0, 'good', 2.0/12)
-elif args.stats == 'forsaking':
-  print_alignment_stats(rpgstats, 1, 'evil-forsakings', 1.0/16)
-elif args.stats == 'stealing':
-  print_alignment_stats(rpgstats, 2, 'evil-stealings', 1.0/16)
-elif args.stats == 'godsend-item':
+if 'quest' in args.stats:
+  print_quest_stats(rpgstats)
+if 'light-shining' in args.stats:
+  print_alignment_stats(rpgstats, 0, 'light-shining', 2.0/12)
+if 'forsaking' in args.stats:
+  print_alignment_stats(rpgstats, 1, 'forsaking', 1.0/16)
+if 'stealing' in args.stats:
+  print_alignment_stats(rpgstats, 2, 'stealing', 1.0/16)
+if 'godsend-item' in args.stats:
   print_gch_stats(rpgstats, 0, "item improvement godsends",    1.0/40)
-elif args.stats == 'godsend-time':
+if 'godsend-time' in args.stats:
   print_gch_stats(rpgstats, 1, "time acceleration godsends",   9.0/40)
-elif args.stats == 'calamity-item':
+if 'calamity-item' in args.stats:
   print_gch_stats(rpgstats, 2, "item detriment calamities",    1.0/80)
-elif args.stats == 'calamity-time':
+if 'calamity-time' in args.stats:
   print_gch_stats(rpgstats, 3, "time deceleration calamities", 9.0/80)
-elif args.stats == 'hand-of-god':
+if 'hand-of-god' in args.stats:
   print_gch_stats(rpgstats, 4, "hands of god",                 1.0/20)
-elif args.stats_of:
-  print_personal_stats(rpgstats, args.stats_of)
-elif args.show == 'levelling':
+for who in args.stats_of:
+  print_personal_stats(rpgstats, who)
+if 'levelling' in args.show:
   print_next_levelling(rpgstats)
-elif args.show == 'plot_levelling':
+if 'plot_levelling' in args.show:
   plot_levels(rpgstats)
-elif args.show == 'quit-strategy':
+if args.quit_strategy:
   show_quit_strategy(rpgstats, args.quit_strategy.split(','))
-elif args.show == 'flat_slopes':
+if 'flat_slopes' in args.show:
   show_flat_slopes(rpgstats)
-else:
-  raise SystemExit("Unrecognized --show flag: "+args.show)
