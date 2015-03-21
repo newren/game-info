@@ -796,11 +796,11 @@ def print_alignment_stats(stats, idx, typestr, times_per_day, show_offliners):
 
 def print_personal_stats(stats, who):
   print "personal statistics: "+who
-  print "type          count  mean stddev #stdevs character"
-  print "------------- ----- ----- ------ ------- ---------"
+  print "type          count  mean stddev #stdevs"
+  print "------------- ----- ----- ------ -------"
   def print_info(stat_type, statinfo):
     print "{:<13s}".format(stat_type),
-    print "{:5d} {:5.1f} {:6.2f} {:7.3f} ".format(*statinfo[who]) + who
+    print "{:5d} {:5.1f} {:6.2f} {:7.3f} ".format(*statinfo[who])
 
   print_info('Attacker', compute_basic_stats(stats, 'attack_stats', [who]))
   print_info('Quests', compute_basic_stats(stats, 'quest_stats', [who]))
