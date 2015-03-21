@@ -24,7 +24,10 @@ current_time = time.time()  # Yeah, yeah, globals are bad.  *shrug*
 now = current_time
 
 def convert_to_epoch(timestring):
-  timetuple = datetime.strptime(timestring, '%Y-%m-%d %H:%M:%S').timetuple()
+  if ':' in timestring:
+    timetuple = datetime.strptime(timestring, '%Y-%m-%d %H:%M:%S').timetuple()
+  else:
+    timetuple = datetime.strptime(timestring, '%Y-%m-%d').timetuple()
   return time.mktime(timetuple)
 def convert_to_duration(days, hours, mins, secs):
   return 86400*int(days) + 3600*int(hours) + 60*int(mins) + int(secs)
