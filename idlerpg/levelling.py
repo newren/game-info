@@ -870,11 +870,32 @@ def show_quit_strategy(stats, quitters):
              time_format(penalties[who][0]),
              time_format(penalties[who][1]),
              who))
+
+  # Find out any important folks who might go up a level before quest ends
   if stats.questers:
-    best = sum(1.0 for x in stats.quest_times
-               if stats.quest_started+x-now < stats['elijah']['timeleft'])
-    odds = best/len(stats.quest_times)
-    print("Odds of quest completion before elijah levels: {}%".format(100*odds))
+    possible_levellers = ""
+    for who in sorted(stats, key=lambda x:stats[x]['level']):
+      # Ignore them if they can't go up a level, or are way behind me
+      if not stats[who]['online']:
+        continue
+      if stats[who]['level'] < stats['elijah']['level'] - 10:
+        continue
+
+      # Find out the odds of them levelling before quest ends; assuming
+      # optimistic burndown rate
+      ettl_opt, ettl_exp = expected_ttl(stats, who)
+      if stats.quest_time_left:
+        quest_end = stats.quest_started+stats.quest_time_left
+        odds = 1 if (quest_end > now+ettl_opt) else 0
+      else:
+        num_longer_quests = sum(1.0 for qtime in stats.quest_times
+                                if stats.quest_started+qtime > now+ettl_opt)
+        odds = num_longer_quests/len(stats.quest_times)
+      # If this person might level, include their info
+      if odds > 0:
+        possible_levellers += " {} ({:.1f}%)".format(who, int(100*odds))
+    print("Folks who may level before quest completes:" +
+          (possible_levellers or " No one."))
 
 def show_flat_slopes(stats):
   penalties = {}
