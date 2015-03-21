@@ -967,10 +967,23 @@ def parse_args(rpgstats, irclog):
       setattr(namespace, self.dest, num_compares)
       ensure_parsed(rpgstats, irclog, count=num_compares)
       copy_for_comparison(rpgstats)
+  class DoTimeComparison(argparse.Action):
+    # "--since X" is shorthand for "--until X --compare --until now --compare"
+    def __call__(self, parser, namespace, values, option_string=None):
+      # Make fake action objects; passing only the necessary fields
+      fakeParseEndTime = ParseEndTime(None,None)
+      fakeRecordForComparison = RecordForComparison(None,'compare')
+      # Call them to simulate the --since shorthand
+      fakeParseEndTime(parser, namespace, values, '--until')
+      fakeRecordForComparison(parser, namespace, [], '--compare')
+      fakeParseEndTime(parser, namespace, 'now', '--until')
+      fakeRecordForComparison(parser, namespace, [], '--compare')
 
   parser = argparse.ArgumentParser(description='Frobnicate the unobtanium')
   parser.add_argument('--until', type=str, action=ParseEndTime,
                       help='Get state of channel until this specified time (default: now)')
+  parser.add_argument('--since', type=str, action=DoTimeComparison,
+                      help='Get state of channel since this specified time')
   parser.add_argument('--whatif', type=str, action=TweakStats,
                       help='Changes; comma-sep-userlist[:attribN:valueN]*')
   parser.add_argument('--compare', action=RecordForComparison,
