@@ -18,6 +18,7 @@ import math
 import operator
 import re
 import subprocess
+import sys
 import time
 
 current_time = time.time()  # Yeah, yeah, globals are bad.  *shrug*
@@ -51,7 +52,9 @@ class IdlerpgStats(defaultdict):
     self.quest_time_left = None
     self.questers = []
     self.next_quest = 0
-    self.last_line = None
+    self.logfiles = []
+    self.last_lines = []
+    self.last_epoch_and_line = None
     self.levels = defaultdict(list)
 
   def handle_timeleft(self, m, epoch):
@@ -175,59 +178,92 @@ class IdlerpgStats(defaultdict):
             rpgstats[who][attrib] = value
       self.update_offline()
 
-  def next_lines(self, f):
-    if self.last_line:
-      yield self.last_line
-    for line in f:
-      self.last_line = line
-      yield line
+  def add_log(self, filename, translate_you=None):
+    class FileReplacement(file):
+      def __init__(self, replacement_text, *args):
+        super(FileReplacement, self).__init__(*args)
+        self.replacement_text = replacement_text
+      def __iter__(self):
+        return self
+      def next(self):
+        while True:
+          line = super(FileReplacement, self).next()
+          if re.search(r'(?:BEGIN|ENDING) LOGGING AT', line):
+            continue
+          return re.sub(r'\bYou\b', self.replacement_text, line)
 
-  def parse_lines(self, f):
+    if translate_you:
+      self.logfiles.append(FileReplacement(translate_you, filename))
+    else:
+      self.logfiles.append(open(filename))
+
+  def next_line(self):
+    def get_next_epoch_and_line(logfile):
+      for line in logfile:
+        epoch_re = r'(?P<epoch>[\d-]{10} [\d:]{8})'
+        m = re.match(epoch_re+r' \*\s*(\S* has (?:quit|left))', line) or \
+            re.match(epoch_re+" <idlerpg>\t(.*)$", line) or \
+            re.match(epoch_re+" -idlerpg-\t(.*)$", line) or \
+            re.match(epoch_re+"-idlerpg\([^\)]*\)- (.*)$", line)
+        if m:
+          epoch = convert_to_epoch(m.group('epoch'))
+          rest = m.group(2)
+          return epoch, rest
+
+        m = re.match(r'\*\*\*\* (?:BEGIN|ENDING) LOGGING AT (.*)', line)
+        if m:
+          ed = m.group(1)
+          timetuple = datetime.strptime(ed, '%a %b %d %H:%M:%S %Y').timetuple()
+          epoch = time.mktime(timetuple)
+          return epoch, line
+
+      return sys.maxint, ''
+
+    if self.last_epoch_and_line:
+      yield self.last_epoch_and_line
+    if not self.last_lines:
+      for logfile in self.logfiles:
+        self.last_lines.append(get_next_epoch_and_line(logfile))
+    while True:
+      el, nl = min(zip(self.last_lines, enumerate(self.logfiles)))
+      epoch, line = el
+      if epoch == sys.maxint:
+        raise StopIteration
+      self.last_epoch_and_line = el
+      n, logfile = nl
+      self.last_lines[n] = get_next_epoch_and_line(logfile)
+      yield epoch, line
+
+  def parse_lines(self):
     last_leveller = None
     nextlvl_re="[Nn]ext level in (?P<days>\d+) days?, (?P<hours>\d{2}):(?P<mins>\d{2}):(?P<secs>\d{2})"
-    for line in self.next_lines(f):
+    for epoch, line in self.next_line():
+      # Quit parsing lines if we've gone as far as we're supposed to
+      if epoch > now:
+        break
+
       #
       # Check for going offline
       #
 
       # Just a single user quitting
-      m = re.match(r'(?P<postdate>[\d-]{10} [\d:]{8}) \*\s*(?P<nick>.*) has (?:quit|left)', line)
+      m = re.match(r'(?P<nick>.*) has (?:quit|left)', line)
       if m:
-        nick = m.group('nick')
-        post_epoch = convert_to_epoch(m.group('postdate'))
-        if post_epoch > now:
-          break
-        who = self.player.get(nick)
+        who = self.player.get(m.group('nick'))
         if who in self:
           if self[who]['online']:
             self[who]['timeleft'] += 20*1.14**self[who]['level']
-          self.ensure_offline(who, post_epoch, known_offline=True)
+          self.ensure_offline(who, epoch, known_offline=True)
         continue
 
       # I got disconnected somehow
       m = re.match(r'\*\*\*\* ENDING LOGGING AT (.*)', line)
       if m:
-        enddate = m.group(1)
-        timetuple = datetime.strptime(enddate, '%a %b %d %H:%M:%S %Y').timetuple()
-        post_epoch = time.mktime(timetuple)
-        if post_epoch > now:
-          break
         for who in self:
           if self[who]['online'] != None:
-            self[who]['last_logbreak_seen'] = post_epoch
-          self.ensure_offline(who, post_epoch, known_offline=False)
+            self[who]['last_logbreak_seen'] = epoch
+          self.ensure_offline(who, epoch, known_offline=False)
         continue
-
-      #
-      # ALL CASES: Get the time of the post, and the remainder of the line
-      #
-      m = re.match("(?P<postdate>[\d-]{10} [\d:]{8}) <idlerpg>\t(.*)$", line)
-      if not m:
-        continue
-      postdate, line = m.groups()
-      epoch = convert_to_epoch(postdate)
-      if epoch > now:
-        break
 
       #
       # Check for quest starting
@@ -436,9 +472,9 @@ class IdlerpgStats(defaultdict):
                                '???' if self[who]['online'] is None else 'no')
 
 
-  def parse(self, fileobj):
+  def parse(self):
     try:
-      self.parse_lines(f)
+      self.parse_lines()
     except StopIteration:
       pass
     self.update_offline()
@@ -943,16 +979,16 @@ def show_flat_slopes(stats, show_offliners):
              time_format(flat_ttl_exp),
              who))
 
-def parse_args(rpgstats, irclog):
-  # A few helper functions for calling rpgstats.parse(irclog) and keeping
+def parse_args(rpgstats):
+  # A few helper functions for calling rpgstats.parse() and keeping
   # track of whether and how many times we have done so.
-  def ensure_parsed(stats, log, count=1):
+  def ensure_parsed(stats, count=1):
     if ensure_parsed.count < count:
-      stats.parse(log)
+      stats.parse()
       ensure_parsed.count += 1
   ensure_parsed.count = 0
-  def force_parse(stats, log):
-    stats.parse(log)
+  def force_parse(stats):
+    stats.parse()
     ensure_parsed.count += 1
 
   comparisons = []
@@ -984,16 +1020,16 @@ def parse_args(rpgstats, irclog):
         if rpgstats[who]['online']:
           rpgstats[who]['timeleft'] -= (new_time-old_time)
           rpgstats.adjust_total_time_by_alignment(who, old_time, increase=True)
-      force_parse(rpgstats, irclog)
+      force_parse(rpgstats)
   class TweakStats(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
-      ensure_parsed(rpgstats, irclog)
+      ensure_parsed(rpgstats)
       rpgstats.apply_attribute_modifications(values, now)
   class RecordForComparison(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
       num_compares = getattr(namespace, self.dest)+1
       setattr(namespace, self.dest, num_compares)
-      ensure_parsed(rpgstats, irclog, count=num_compares)
+      ensure_parsed(rpgstats, count=num_compares)
       copy_for_comparison(rpgstats)
   class DoTimeComparison(argparse.Action):
     # "--since X" is shorthand for "--until X --compare --until now --compare"
@@ -1046,7 +1082,7 @@ def parse_args(rpgstats, irclog):
   args = parser.parse_args()
 
   # Make sure the log is parsed
-  ensure_parsed(rpgstats, irclog)
+  ensure_parsed(rpgstats)
 
   # Sanity checking and specialized defaults
   if args.quit_strategy is not None:
@@ -1112,8 +1148,12 @@ def parse_args(rpgstats, irclog):
 
 
 rpgstats = IdlerpgStats()
-with open('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log') as f:
-  args = parse_args(rpgstats, f)
+rpgstats.add_log('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log')
+rpgstats.add_log('/home/newren/.xchat2/xchatlogs/Palantir-idlerpg.log',
+                 translate_you='elijah')
+rpgstats.add_log('/home/newren/irclogs/Palantir/idlerpg.log',
+                 translate_you='elijah')
+args = parse_args(rpgstats)
 if 'summary' in args.show:
   print_summary_info(rpgstats, args.offline)
 if 'burninfo' in args.show:
