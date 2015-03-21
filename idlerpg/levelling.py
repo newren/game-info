@@ -416,9 +416,10 @@ class IdlerpgStats(defaultdict):
     # Mark people as offline if they're unknown but their ttl suggests they
     # should have already levelled by now
     for who in self:
-      if self[who]['online'] is None and \
-         self[who]['timeleft']+self[who]['last_logbreak_seen'] < now:
-        self[who]['online'] = False
+      if self[who]['online'] is None:
+        ettl_opt, ettl_exp = expected_ttl(self, who)
+        if ettl_opt+self[who]['last_logbreak_seen'] < now:
+          self[who]['online'] = False
       self[who]['stronline'] = 'yes' if self[who]['online'] else (
                                '???' if self[who]['online'] is None else 'no')
 
