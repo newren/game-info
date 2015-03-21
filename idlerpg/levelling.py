@@ -8,14 +8,13 @@
 #     which makes it hard to guess the correct data; I can only tell what the
 #     correct data is once logging restarts and messages about each user
 #     come in giving me updated information.
-# TODO
-#   * Stealing counting doesn't check the additional logfiles that it should
 
 from datetime import datetime, timedelta
 from collections import defaultdict, deque, Counter
 import argparse
 import math
 import operator
+import os
 import re
 import subprocess
 import sys
@@ -396,6 +395,14 @@ class IdlerpgStats(defaultdict):
         factor = {'good':1.1, 'neutral':1.0, 'evil':0.9}
         self[thief]['itemsum']  += factor[self[thief]['alignment']] *change
         self[victim]['itemsum'] -= factor[self[victim]['alignment']]*change
+
+      # X made to steal Y's .*, but realized it [was worse than what they had]
+      m = re.match(r"(?P<thief>.*) made to steal (?P<victim>.*)'s (?P<item>.*), but realized it was lower level than your own.", line)
+      if m:
+        thief, victim, item = m.groups()
+        self.change_alignment(thief,  'evil', epoch)
+        self.change_alignment(victim, 'good', epoch)
+        self[thief]['alignment_stats'][2] += 1
 
       #
       # Check for godsends, calamities, and hogs
@@ -1153,6 +1160,9 @@ rpgstats.add_log('/home/newren/.xchat2/xchatlogs/Palantir-idlerpg.log',
                  translate_you='elijah')
 rpgstats.add_log('/home/newren/irclogs/Palantir/idlerpg.log',
                  translate_you='elijah')
+os.system('rsync -a pt-scm-staging-01:irclogs/Palantir/ /home/newren/irclogs/Palantir-yellow/')
+rpgstats.add_log('/home/newren/irclogs/Palantir-yellow/idlerpg.log',
+                 translate_you='Atychiphobe')
 args = parse_args(rpgstats)
 if 'summary' in args.show:
   print_summary_info(rpgstats, args.offline)
