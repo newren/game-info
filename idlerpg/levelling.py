@@ -8,7 +8,7 @@
 #     which makes it hard to guess the correct data; I can only tell what the
 #     correct data is once logging restarts and messages about each user
 #     come in giving me updated information.
-#   * Quest statistics don't check that players have been online for >= 10 hours
+# TODO
 #   * Stealing counting doesn't check the additional logfiles that it should
 
 from datetime import datetime, timedelta
@@ -35,6 +35,7 @@ def convert_to_duration(days, hours, mins, secs):
 def default_player():
   return {'level':0, 'timeleft':0, 'itemsum':0, 'alignment':'neutral',
           'online':None, 'stronline':'no', 'last_logbreak_seen':0,
+          'online_since':0,
           'attack_stats':[0,0,0], 'quest_stats':[0,0,0],
           'total_time_stats':[0,0,0], 'alignment_stats':[0,0,0],
           'gch_stats':[0,0,0,0,0]
@@ -83,6 +84,9 @@ class IdlerpgStats(defaultdict):
   def ensure_online(self, who, epoch):
     if not self[who]['online']:
       self.adjust_total_time_by_alignment(who, epoch, increase=True)
+    if self[who]['online'] == False or (
+       self[who]['online'] is None and self[who]['online_since'] == 0):
+      self[who]['online_since'] = epoch
     self[who]['online'] = True
 
   def adjust_timeleft_percentage(self, who, post_epoch, percentage):
@@ -107,10 +111,18 @@ class IdlerpgStats(defaultdict):
     for who in questers:
       self.ensure_online(who, epoch)
 
-    # Record stats related to quests
-    # FIXME should also verify user has been online for 10 hours
+    # Determine who could have been selected for this quest.  Due to
+    # inability to perfectly know who is online and what level they are
+    # (particularly for the first few log entries), we have to also
+    # assume that if they were selected then they must have been possible
+    # candidates for selection.  Crazy, I know.  If they weren't selected,
+    # though, use the normal rules of level>=40 and online for more than
+    # 10 hours.
     possibles = [x for x in self
-                 if self[x]['online'] and self[x]['level'] >= 40]
+                 if x in questers or (
+                    self[x]['online'] and self[x]['level'] >= 40 and
+                    self[x]['online_since'] < epoch-36000)]
+    # Record stats related to quests
     for x in possibles:
       self[x]['quest_stats'][0] += 4.0/len(possibles)
       self[x]['quest_stats'][1] += 1
