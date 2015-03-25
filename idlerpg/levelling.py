@@ -38,7 +38,23 @@ def default_player():
           'online_since':0,
           'attack_stats':[0,0,0], 'quest_stats':[0,0,0],
           'total_time_stats':[0,0,0], 'alignment_stats':[0,0,0],
-          'gch_stats':[0,0,0,0,0]
+          'gch_stats':[0,0,0,0,0],
+          # item_info: godsend/calamity:   item_name, multiplier
+          #            levelling:          'level', None
+          #            no unhandled event: None, None
+          #            early parsing:      'ignore', None
+          'item_info':('ignore', None),
+          # item_stats[item] -> presumed level, confidence (percentage)
+          'item_stats':{"ring":(0,0),
+                        "amulet":(0,0),
+                        "charm":(0,0),
+                        "weapon":(0,0),
+                        "helm":(0,0),
+                        "tunic":(0,0),
+                        "pair of gloves":(0,0),
+                        "set of leggings":(0,0),
+                        "shield":(0,0),
+                        "pair of boots":(0,0)}
          }
 
 class IdlerpgStats(defaultdict):
@@ -157,6 +173,77 @@ class IdlerpgStats(defaultdict):
     self[who]['alignment'], old = align, self[who]['alignment']
     self[who]['itemsum'] = int(self[who]['itemsum']*factor[align]/factor[old])
     self.adjust_total_time_by_alignment(who, epoch, increase=True)
+
+
+  def handle_item_stats(self, who, event_type, item, multiplier):
+    if event_type == 'level':
+      item_info = ('level', None)
+    elif event_type in ('godsend', 'calamity'):
+      item_info = (item, multiplier)
+    else:
+      raise SystemExit("Unhandled event_type: {}".format(event_type))
+
+    if self[who]['level'] > 30:
+      if self[who]['item_info'] in ((None, None), ('ignore', None)):
+        self[who]['item_info'] = item_info
+      else:
+        raise SystemExit("Received {},{},{} for {} (level {}) when item_info was already {}".format(event_type, item, multiplier, who, self[who]['level'], self[who]['item_info']))
+
+  def handle_battle_item_stats(self, who, newitemsum):
+    last_event_type, multiplier = self[who]['item_info']
+    olditemsum, self[who]['itemsum'] = self[who]['itemsum'], newitemsum
+    change = newitemsum - olditemsum
+    factor = {'good':1.1, 'neutral':1.0, 'evil':0.9}[self[who]['alignment']]
+    real_change = math.ceil(newitemsum/factor) - math.ceil(olditemsum/factor)
+    if last_event_type in (None, 'ignore'):
+      return
+    elif change == 0:
+      pass # do nothing
+    elif last_event_type == 'level':
+      # FIXME: Find out which items could have accounted for 'change'.  Don't
+      # just assume all items could account for the change.  (e.g. if
+      # weapon value is over 350, it can't get any higher).
+      # - If only 1 item, set it's value accordingly and confidence to 100%.
+      # - Otherwise, multiply all such items confidence by (num-1)/num.
+      for item in self[who]['item_stats']:
+        itemvalue, confidence = self[who]['item_stats'][item]
+        self[who]['item_stats'][item] = (itemvalue, confidence*9.0/10)
+    else:
+      item = last_event_type
+      item_value, confidence = self[who]['item_stats'][item]
+      if confidence == 100:
+        # If confidence is 100%, make sure change is exactly as expected
+        new_item_value = int(item_value * multiplier)
+        expected_change = int(factor*(new_item_value - item_value))
+        if abs(real_change - expected_change) > 1:
+          raise SystemExit("Didn't match:", who, item_value, confidence, multiplier, change, newitemsum, expected_change, item)
+        # Record new item value
+        self[who]['item_stats'][item] = (new_item_value, 100)
+      else:
+        # If confidence is not 100%, use the change in total itemsum, the
+        # user's alignment, and knowledge that it came from the specified
+        # item getting the specified multiplier to determine the item's
+        # current value to pretty close to the exact value (the various
+        # truncations to int in the process prohibit exact calculations).
+        new_item_value = int(real_change*multiplier/(multiplier-1)+1e-5)
+        self[who]['item_stats'][item] = (new_item_value, 99)
+
+    # Mark everything as handled now
+    self[who]['item_info'] = (None, None)
+
+  def swap_items(self, winner, loser, item, new_level, old_level):
+    def record_new_item(who, level, expected_old_level):
+      oldlvl, confidence = self[who]['item_stats'][item]
+      if confidence >= 99 and abs(oldlvl - expected_old_level) > 9:
+        raise SystemExit("Mismatch for {}; {} vs {}".format(who, oldlvl, expected_old_level))
+      self[who]['item_stats'][item] = (level, 100.0)
+
+      change = level - oldlvl
+      factor = {'good':1.1, 'neutral':1.0, 'evil':0.9}[self[who]['alignment']]
+      self[who]['itemsum'] += int(factor*change)
+
+    record_new_item(winner, new_level, expected_old_level = old_level)
+    record_new_item(loser,  old_level, expected_old_level = new_level)
 
   def apply_attribute_modifications(self, attrib_list_changes, epoch):
     if attrib_list_changes:
@@ -326,6 +413,7 @@ class IdlerpgStats(defaultdict):
         self[who]['level'] = int(m.group('level'))
         self.levels[who].append((m.group('level'), epoch))
         self.handle_timeleft(m, epoch)
+        self.handle_item_stats(who, 'level', None, None)
         continue
 
       # Y reaches next level in...
@@ -349,15 +437,21 @@ class IdlerpgStats(defaultdict):
       # Check for itemsums
       #
 
+      # A change of items after a fierce battle
+      m = re.match(r"In the fierce battle, (?P<defender>.*) dropped their level (?P<new_level>\d+) (?P<item>.*)! (?P<attacker>.*) picks it up, tossing their old level (?P<old_level>\d+) .* to .*\.", line)
+      if m:
+        defender, newlvl, item, attacker, oldlvl = m.groups()
+        self.swap_items(attacker, defender, item, int(newlvl), int(oldlvl))
+
       # Two individuals battling, either due to time (1/hour) or space (grid)
       m = re.match(r"(?P<attacker>.*) \[\d+/(?P<attacker_sum>\d+)\] has (?P<battle_type>challenged|come upon) (?P<defender>.*) \[\d+/(?P<defender_sum>\d+)\]", line)
       if m:
         attacker, attacker_sum, battle_type, defender, defender_sum = m.groups()
         if defender != 'idlerpg':
-          self[defender]['itemsum'] = int(defender_sum)
+          self.handle_battle_item_stats(defender, int(defender_sum))
           self.ensure_online(defender, epoch)
         if attacker != 'idlerpg':
-          self[attacker]['itemsum'] = int(attacker_sum)
+          self.handle_battle_item_stats(attacker, int(attacker_sum))
           self.ensure_online(attacker, epoch)
           if attacker != last_leveller:
             if battle_type == 'challenged':
@@ -388,13 +482,10 @@ class IdlerpgStats(defaultdict):
       m = re.match(r"(?P<who>.*) stole (?P<victim>.*)'s level (?P<newlvl>\d+) (?P<item>.*) while they were sleeping! .* leaves their old level (?P<oldlvl>\d+) .* behind, which .* then takes.", line)
       if m:
         thief, victim, newlvl, item, oldlvl = m.groups()
-        change = int(newlvl)-int(oldlvl)
+        self.swap_items(thief, victim, item, int(newlvl), int(oldlvl))
         self.change_alignment(thief,  'evil', epoch)
         self.change_alignment(victim, 'good', epoch)
         self[thief]['alignment_stats'][2] += 1
-        factor = {'good':1.1, 'neutral':1.0, 'evil':0.9}
-        self[thief]['itemsum']  += factor[self[thief]['alignment']] *change
-        self[victim]['itemsum'] -= factor[self[victim]['alignment']]*change
 
       # X made to steal Y's .*, but realized it [was worse than what they had]
       m = re.match(r"(?P<thief>.*) made to steal (?P<victim>.*)'s (?P<item>.*), but realized it was lower level than your own.", line)
@@ -407,17 +498,21 @@ class IdlerpgStats(defaultdict):
       #
       # Check for godsends, calamities, and hogs
       #
-      m = re.match(r".*! (?P<who>\w+)'s.*gains 10% effectiveness", line)
+      m = re.match(r".*! (?P<who>\w+)'s (?P<item>.*) gains 10% effectiveness", line)
       if m:
-        self[m.group('who')]['gch_stats'][0] += 1
+        who, item = m.groups()
+        self[who]['gch_stats'][0] += 1
+        self.handle_item_stats(who, 'godsend', item, 1.1)
         continue
       m = re.match('(?P<who>\w+).*wondrous godsend has accelerated', line)
       if m:
         self[m.group('who')]['gch_stats'][1] += 1
         continue
-      m = re.match('(?P<who>\w+).*loses 10% of its effectiveness', line)
+      m = re.match(r".*! (?P<who>\w+)'s (?P<item>.*) loses 10% of its effectiveness", line)
       if m:
-        self[m.group('who')]['gch_stats'][2] += 1
+        who, item = m.groups()
+        self[who]['gch_stats'][2] += 1
+        self.handle_item_stats(who, 'calamity', item, 0.9)
         continue
       m = re.match('(?P<who>\w+).*terrible calamity has slowed them', line)
       if m:
@@ -856,6 +951,25 @@ def print_personal_stats(stats, who):
   print_info('Calamity-time', compute_gch_stats(stats, 3, 9.0/80, [who]))
   print_info('Hand of God', compute_gch_stats(stats, 4, 1.0/20, [who]))
 
+def print_item_stats(stats):
+  item_list = ("ring",
+               "amulet",
+               "charm",
+               "weapon",
+               "helm",
+               "tunic",
+               "pair of gloves",
+               "set of leggings",
+               "shield",
+               "pair of boots")
+  for item in item_list:
+    print "  {:8s}".format(item.split()[-1]),
+  print 'character'
+  for who in stats:
+    for item in item_list:
+      print "{:3d} ({:3.0f}%)".format(*stats[who]['item_stats'][item]),
+    print who
+
 def plot_levels(rpgstats):
   import matplotlib.pyplot as plt
   import numpy as np
@@ -1068,7 +1182,7 @@ def parse_args(rpgstats):
                                'plot_levelling', 'flat_slopes'],
                       help='Which kind of info to show')
   parser.add_argument('--stats', action='append', default=[],
-                      choices=['attacker', 'quest',
+                      choices=['attacker', 'quest', 'item',
                                'light-shining', 'forsaking', 'stealing',
                                'godsend-item', 'godsend-time',
                                'calamity-item', 'calamity-time',
@@ -1170,6 +1284,8 @@ if 'burninfo' in args.show:
   print_detailed_burn_info(rpgstats, args.offline)
 if 'attacker' in args.stats:
   print_attacker_stats(rpgstats, args.offline)
+if 'item' in args.stats:
+  print_item_stats(rpgstats)
 if 'quest' in args.stats:
   print_quest_stats(rpgstats, args.offline)
 if 'light-shining' in args.stats:
