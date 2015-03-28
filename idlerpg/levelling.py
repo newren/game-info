@@ -951,7 +951,7 @@ def print_personal_stats(stats, who):
   print_info('Calamity-time', compute_gch_stats(stats, 3, 9.0/80, [who]))
   print_info('Hand of God', compute_gch_stats(stats, 4, 1.0/20, [who]))
 
-def print_item_stats(stats):
+def print_item_stats(stats, show_offliners):
   item_list = ("ring",
                "amulet",
                "charm",
@@ -965,7 +965,10 @@ def print_item_stats(stats):
   for item in item_list:
     print "  {:8s}".format(item.split()[-1]),
   print 'character'
-  for who in stats:
+  factor = {'good':1.1, 'neutral':1.0, 'evil':0.9}
+  for who in sorted(stats, key=lambda x:stats[x]['itemsum']/factor[stats[x]['alignment']]):
+    if stats[who]['stronline'] == 'no' and not show_offliners:
+      continue
     for item in item_list:
       print "{:3d} ({:3.0f}%)".format(*stats[who]['item_stats'][item]),
     print who
@@ -1285,7 +1288,7 @@ if 'burninfo' in args.show:
 if 'attacker' in args.stats:
   print_attacker_stats(rpgstats, args.offline)
 if 'item' in args.stats:
-  print_item_stats(rpgstats)
+  print_item_stats(rpgstats, args.offline)
 if 'quest' in args.stats:
   print_quest_stats(rpgstats, args.offline)
 if 'light-shining' in args.stats:
