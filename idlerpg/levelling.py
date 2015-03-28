@@ -308,16 +308,16 @@ class IdlerpgStats(defaultdict):
     if self.last_epoch_and_line:
       yield self.last_epoch_and_line
     if not self.last_lines:
-      for logfile in self.logfiles:
-        self.last_lines.append(get_next_epoch_and_line(logfile))
+      for nr,logfile in enumerate(self.logfiles):
+        epoch, line = get_next_epoch_and_line(logfile)
+        self.last_lines.append((epoch,nr,line,logfile))
     while True:
-      el, nl = min(zip(self.last_lines, enumerate(self.logfiles)))
-      epoch, line = el
+      epoch, nr, line, logfile = min(self.last_lines)
       if epoch == sys.maxint:
         raise StopIteration
-      self.last_epoch_and_line = el
-      n, logfile = nl
-      self.last_lines[n] = get_next_epoch_and_line(logfile)
+      self.last_epoch_and_line = (epoch, line)
+      nextepoch, nextline = get_next_epoch_and_line(logfile)
+      self.last_lines[nr] = (nextepoch,nr,nextline,logfile)
       yield epoch, line
 
   def parse_lines(self):
@@ -1293,7 +1293,6 @@ def parse_args(rpgstats):
 
 
 rpgstats = IdlerpgStats()
-rpgstats.add_log('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log')
 rpgstats.add_log('/home/newren/.xchat2/xchatlogs/Palantir-idlerpg.log',
                  translate_you='elijah')
 rpgstats.add_log('/home/newren/irclogs/Palantir/idlerpg.log',
@@ -1301,6 +1300,9 @@ rpgstats.add_log('/home/newren/irclogs/Palantir/idlerpg.log',
 os.system('rsync -a pt-scm-staging-01:irclogs/Palantir/ /home/newren/irclogs/Palantir-yellow/')
 rpgstats.add_log('/home/newren/irclogs/Palantir-yellow/idlerpg.log',
                  translate_you='Atychiphobe')
+# We want 'You found a level X <item>!' messages to come before the 'Y has attained level Z!'
+# messages, so we list the main log after the other logs
+rpgstats.add_log('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log')
 args = parse_args(rpgstats)
 if 'summary' in args.show:
   print_summary_info(rpgstats, args.offline)
