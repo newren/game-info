@@ -437,6 +437,27 @@ class IdlerpgStats(defaultdict):
       # Check for itemsums
       #
 
+      # Finding new items
+      m = re.match(r".*(?P<who>\b.+) (?:have found the|found a) level (?P<level>\d+) (?P<item>.*?)!", line)
+      if m:
+        who, level, item = m.groups()
+        map = {"Crown":"helm",
+               "Sparkliness":"ring",
+               "Mail":"tunic",
+               "Sword":"weapon",
+               "Rage":"weapon",
+               "Swiftness":"pair of boots",
+               "Doom":"weapon"}
+        item = map.get(item.split()[-1], item)
+        oldvalue, confidence = self[who]['item_stats'][item]
+        if confidence == 100:
+          factor = {'good':1.1, 'neutral':1.0, 'evil':0.9}[self[who]['alignment']]
+          olditemsum = math.ceil(self[who]['itemsum']/factor)
+          newitemsum = olditemsum + (int(level)-oldvalue)
+          self[who]['itemsum'] = int(factor*newitemsum)
+        self[who]['item_stats'][item] = (int(level), 100)
+        self[who]['item_info'] = ('ignore_level', None)
+
       # A change of items after a fierce battle
       m = re.match(r"In the fierce battle, (?P<defender>.*) dropped their level (?P<new_level>\d+) (?P<item>.*)! (?P<attacker>.*) picks it up, tossing their old level (?P<old_level>\d+) .* to .*\.", line)
       if m:
