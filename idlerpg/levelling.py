@@ -171,7 +171,7 @@ class IdlerpgStats(defaultdict):
     factor = {'good':1.1, 'neutral':1.0, 'evil':0.9}
     self.adjust_total_time_by_alignment(who, epoch, increase=False)
     self[who]['alignment'], old = align, self[who]['alignment']
-    self[who]['itemsum'] = int(self[who]['itemsum']*factor[align]/factor[old])
+    self[who]['itemsum'] = int(math.ceil(self[who]['itemsum']/factor[old])*factor[align])
     self.adjust_total_time_by_alignment(who, epoch, increase=True)
 
 
