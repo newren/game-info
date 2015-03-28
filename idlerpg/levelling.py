@@ -177,8 +177,21 @@ class IdlerpgStats(defaultdict):
 
   def handle_item_stats(self, who, event_type, item, multiplier):
     if event_type == 'level':
-      item_info = ('level', None)
+      if self[who]['item_info'][0] == 'ignore_level':
+        self[who]['item_info'] = (None, None)
+        item_info = (None, None)
+      else:
+        item_info = ('level', None)
     elif event_type in ('godsend', 'calamity'):
+      item_value, confidence = self[who]['item_stats'][item]
+      if confidence == 100:
+        factor = {'good':1.1, 'neutral':1.0, 'evil':0.9}[self[who]['alignment']]
+        new_item_value = int(item_value * multiplier)
+        olditemsum = int(self[who]['itemsum']/factor+1e-5)
+        newitemsum = olditemsum+(new_item_value-item_value)
+        self[who]['itemsum'] = int(newitemsum*factor)
+        self[who]['item_stats'][item] = (new_item_value, 100)
+        return
       item_info = (item, multiplier)
     else:
       raise SystemExit("Unhandled event_type: {}".format(event_type))
@@ -211,22 +224,14 @@ class IdlerpgStats(defaultdict):
     else:
       item = last_event_type
       item_value, confidence = self[who]['item_stats'][item]
-      if confidence == 100:
-        # If confidence is 100%, make sure change is exactly as expected
-        new_item_value = int(item_value * multiplier)
-        expected_change = int(factor*(new_item_value - item_value))
-        if abs(real_change - expected_change) > 1:
-          raise SystemExit("Didn't match:", who, item_value, confidence, multiplier, change, newitemsum, expected_change, item)
-        # Record new item value
-        self[who]['item_stats'][item] = (new_item_value, 100)
-      else:
-        # If confidence is not 100%, use the change in total itemsum, the
-        # user's alignment, and knowledge that it came from the specified
-        # item getting the specified multiplier to determine the item's
-        # current value to pretty close to the exact value (the various
-        # truncations to int in the process prohibit exact calculations).
-        new_item_value = int(real_change*multiplier/(multiplier-1)+1e-5)
-        self[who]['item_stats'][item] = (new_item_value, 99)
+      assert confidence != 100  # confidence==100 should be handled elsewhere
+      # Use the change in total itemsum, the user's alignment, and
+      # knowledge that it came from the specified item getting the specified
+      # multiplier to determine the item's current value to pretty close to
+      # the exact value (the various truncations to int in the process
+      # prohibit exact calculations).
+      new_item_value = int(real_change*multiplier/(multiplier-1)+1e-5)
+      self[who]['item_stats'][item] = (new_item_value, 99)
 
     # Mark everything as handled now
     self[who]['item_info'] = (None, None)
