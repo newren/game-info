@@ -1073,16 +1073,18 @@ def show_quit_strategy(stats, quitters):
 
     ettl_finish_exp = solve_ttl_to_0(mult*stats[who]['timeleft'], br2, ab)
     ettl_quit_exp = solve_ttl_to_0(penalty+stats[who]['timeleft'], br2, ab)
-    penalties[who] = (ettl_quit_opt-ettl_finish_opt,
+    penalties[who] = (penalty,
+                      ettl_quit_opt-ettl_finish_opt,
                       ettl_quit_exp-ettl_finish_exp)
 
-  print "Lvl XtraOptimstc XtraExpected character"
-  print "--- ------------ ------------ ---------"
+  print "Lvl PlainPenalty XtraOptimstc XtraExpected character"
+  print "--- ------------ ------------ ------------ ---------"
   for who in sorted(penalties, key=lambda x:penalties[x][1]):
-    print('{:3d} {} {} {}'.format(
+    print('{:3d} {} {} {} {}'.format(
              stats[who]['level'],
              time_format(penalties[who][0]),
              time_format(penalties[who][1]),
+             time_format(penalties[who][2]),
              who))
 
   # Find out any important folks who might go up a level before quest ends
