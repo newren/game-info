@@ -598,7 +598,7 @@ class IdlerpgStats(defaultdict):
           self[who]['online'] = False
       self[who]['stronline'] = 'yes' if self[who]['online'] else (
                                '???' if self[who]['online'] is None else 'no')
-
+      self[who]['relevant'] = bool(self[who]['level'] > self['elijah']['level']-2)
 
   def parse(self):
     try:
@@ -811,13 +811,20 @@ def expected_ttl(stats, who): # How much time-to-level decrease in next day
   ttl2 = solve_ttl_to_0(cur_ttl, expected_burn_rate, antiburn)
   return ttl1, ttl2
 
-def print_summary_info(rpgstats, show_offliners):
+def relevant_user(stats, who, show_who):
+  if stats[who]['stronline'] == 'no' and not 'offline' in show_who:
+    return False
+  if not (stats[who]['relevant'] or 'lowlevel' in show_who):
+    return False
+  return True
+
+def print_summary_info(rpgstats, show_who):
   # Print out all the information we've collected
   brkln="--- --- ---- ------------ ---- ------------ ------------ ---------"
   print "Lvl On? ISum  Time-to-Lvl Algn   Optimistic Expected TTL character"
   last = True
   for who in sorted(rpgstats, key=lambda x:(rpgstats[x]['stronline'],rpgstats[x]['timeleft'])):
-    if rpgstats[who]['stronline'] == 'no' and not show_offliners:
+    if not relevant_user(rpgstats, who, show_who):
       continue
     on = rpgstats[who]['stronline']
     assumed_on = bool(on=='yes')
@@ -846,11 +853,11 @@ def compute_burn_info(rpgstats, who):
   critrate = critical_strike_rate(rpgstats,who)
   return (bb, gchb, ab, qbdef, combdef, qbtweak, combtweak, antiburn/86400, critrate)
 
-def print_detailed_burn_info(rpgstats, show_offliners):
+def print_detailed_burn_info(rpgstats, show_who):
   print "Battle g/c/hog align  quest Comb'd    qmod Comb'd  Xburn CritS  Character"
   print "------ ------ ------ ------ ------  ------ ------  ----- -----  ---------"
   for who in sorted(rpgstats, key=lambda x:rpgstats[x]['itemsum']):
-    if rpgstats[who]['stronline'] == 'no' and not show_offliners:
+    if not relevant_user(rpgstats, who, show_who):
       continue
     if 'burnrates' in rpgstats[who]:
       burnrates = rpgstats[who]['burnrates']
@@ -875,23 +882,23 @@ def compute_basic_stats(stats, stat_type, for_whom=None):
     statinfo[who] = (actual, mean, sd, Nsds)
   return statinfo
 
-def print_attacker_stats(stats, show_offliners):
+def print_attacker_stats(stats, show_who):
   statinfo = compute_basic_stats(stats, 'attack_stats')
   print "Battle statistics: number of times as attacker"
   print "actual  mean  stddev #stdevs character"
   print "------ ------ ------ ------- ---------"
   for who in sorted(statinfo, key=lambda x:statinfo[x][3]):
-    if rpgstats[who]['stronline'] == 'no' and not show_offliners:
+    if not relevant_user(rpgstats, who, show_who):
       continue
     print "{:6d} {:6.2f} {:6.2f} {:7.3f} ".format(*statinfo[who]) + who
 
-def print_quest_stats(stats, show_offliners):
+def print_quest_stats(stats, show_who):
   statinfo = compute_basic_stats(stats, 'quest_stats')
   print "Quest statistics: number of times as quester"
   print "actual  mean  stddev #stdevs character"
   print "------ ------ ------ ------- ---------"
   for who in sorted(statinfo, key=lambda x:statinfo[x][3]):
-    if rpgstats[who]['stronline'] == 'no' and not show_offliners:
+    if not relevant_user(rpgstats, who, show_who):
       continue
     print "{:6d} {:6.2f} {:6.2f} {:7.3f} ".format(*statinfo[who]) + who
 
@@ -915,13 +922,13 @@ def compute_gch_stats(stats, idx, times_per_day, for_whom=None):
     statinfo[who] = (count, mean, stddev, Nsds)
   return statinfo
 
-def print_gch_stats(stats, idx, typestr, times_per_day, show_offliners):
+def print_gch_stats(stats, idx, typestr, times_per_day, show_who):
   statinfo = compute_gch_stats(stats, idx, times_per_day)
   print "statistics: number of times received "+typestr
   print "count mean stddev #stdevs character"
   print "----- ---- ------ ------- ---------"
   for who in sorted(statinfo, key=lambda x:statinfo[x][3]):
-    if rpgstats[who]['stronline'] == 'no' and not show_offliners:
+    if not relevant_user(rpgstats, who, show_who):
       continue
     print "{:5d} {:4.1f} {:6.2f} {:7.3f} ".format(*statinfo[who]) + who
 
@@ -947,13 +954,13 @@ def compute_alignment_stats(stats, idx, times_per_day, for_whom=None):
     statinfo[who] = (count, mean, stddev, Nsds)
   return statinfo
 
-def print_alignment_stats(stats, idx, typestr, times_per_day, show_offliners):
+def print_alignment_stats(stats, idx, typestr, times_per_day, show_who):
   statinfo = compute_alignment_stats(stats, idx, times_per_day)
   print "alignment statistics: "+typestr
   print "count mean stddev #stdevs character"
   print "----- ---- ------ ------- ---------"
   for who in sorted(statinfo, key=lambda x:statinfo[x][3]):
-    if rpgstats[who]['stronline'] == 'no' and not show_offliners:
+    if not relevant_user(rpgstats, who, show_who):
       continue
     if statinfo[who][1] != 0:
       print "{:5d} {:4.1f} {:6.2f} {:7.3f} ".format(*statinfo[who]) + who
@@ -977,7 +984,7 @@ def print_personal_stats(stats, who):
   print_info('Calamity-time', compute_gch_stats(stats, 3, 9.0/80, [who]))
   print_info('Hand of God', compute_gch_stats(stats, 4, 1.0/20, [who]))
 
-def print_item_stats(stats, show_offliners):
+def print_item_stats(stats, show_who):
   item_list = ("ring",
                "amulet",
                "charm",
@@ -993,19 +1000,19 @@ def print_item_stats(stats, show_offliners):
   print 'character'
   factor = {'good':1.1, 'neutral':1.0, 'evil':0.9}
   for who in sorted(stats, key=lambda x:stats[x]['itemsum']/factor[stats[x]['alignment']]):
-    if stats[who]['stronline'] == 'no' and not show_offliners:
+    if not relevant_user(rpgstats, who, show_who):
       continue
     for item in item_list:
       print "{:3d} ({:3.0f}%)".format(*stats[who]['item_stats'][item]),
     print who
 
-def plot_levels(rpgstats):
+def plot_levels(rpgstats, show_who):
   import matplotlib.pyplot as plt
   import numpy as np
 
   plt.figure()
-  folks = [x for x in rpgstats.levels.keys() if rpgstats[x]['online'] and rpgstats[x]['level'] > 60]
-  for who in folks: # ('elijah',): #
+  folks = [x for x in rpgstats.levels.keys() if relevant_user(rpgstats, x, show_who)]
+  for who in folks:
     level,when = zip(*rpgstats.levels[who])
     plt.plot(when,level)
   xmin, xmax = plt.xlim()
@@ -1019,7 +1026,7 @@ def plot_levels(rpgstats):
 
   plt.show()
 
-def print_next_levelling(stats):
+def print_next_levelling(stats, show_who):
   def basic_time_to_level(level):
     return 600*1.16**min(level,60) + 86400*max(level-60, 0)
   onliners = [who for who in stats if stats[who]['online']]
@@ -1055,10 +1062,11 @@ def print_next_levelling(stats):
     stats[who_adv]['timeleft'] = basic_time_to_level(stats[who_adv]['level'])
 
     # Notify that who_adv is expected to level at the given time
-    timestr = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(cur))
-    print("{} {:3d} {}".format(timestr, stats[who_adv]['level'], who_adv))
+    if relevant_user(stats, who_adv, show_who):
+      timestr = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(cur))
+      print("{} {:3d} {}".format(timestr, stats[who_adv]['level'], who_adv))
 
-def show_quit_strategy(stats, quitters):
+def show_quit_strategy(stats, quitters, show_who):
   penalties = {}
   for who in stats:
     if not stats[who]['online']:
@@ -1080,6 +1088,8 @@ def show_quit_strategy(stats, quitters):
   print "Lvl PlainPenalty XtraOptimstc XtraExpected character"
   print "--- ------------ ------------ ------------ ---------"
   for who in sorted(penalties, key=lambda x:penalties[x][1]):
+    if not relevant_user(stats, who, show_who):
+      continue
     print('{:3d} {} {} {} {}'.format(
              stats[who]['level'],
              time_format(penalties[who][0]),
@@ -1091,10 +1101,8 @@ def show_quit_strategy(stats, quitters):
   if stats.questers:
     possible_levellers = ""
     for who in sorted(stats, key=lambda x:stats[x]['level']):
-      # Ignore them if they can't go up a level, or are way behind me
-      if not stats[who]['online']:
-        continue
-      if stats[who]['level'] < stats['elijah']['level'] - 10:
+      # Ignore them if they can't go up a level, or are otherwise not relevant
+      if not relevant_user(stats, who, show_who):
         continue
 
       # Find out the odds of them levelling before quest ends; assuming
@@ -1113,12 +1121,12 @@ def show_quit_strategy(stats, quitters):
     print("Folks who may level before quest completes:" +
           (possible_levellers or " No one."))
 
-def show_flat_slopes(stats, show_offliners):
+def show_flat_slopes(stats, show_who):
   penalties = {}
   print "Lvl FlatOptimstc FlatExpected character"
   print "--- ------------ ------------ ---------"
   for who in sorted(stats, key=lambda x:stats[x]['level']):
-    if rpgstats[who]['stronline'] == 'no' and not show_offliners:
+    if not relevant_user(stats, who, show_who):
       continue
     br1, br2, ab = get_burn_rates(stats, who)
 
@@ -1229,14 +1237,20 @@ def parse_args(rpgstats):
                            'lose out on 25%% bonus.  quitter1 gets p16 instead '
                            'of p15.  Current questers assumed if none specifed,'
                            ' but none get the p16 penalty.')
-  parser.add_argument('--offline', action='store_true',
+  parser.add_argument('--offline',
+                      dest='who', action='append_const', const='offline',
                       help='Show information for offline players as well')
+  parser.add_argument('--low-levellers',
+                      dest='who', action='append_const', const='lowlevel',
+                      help='Show information for low level players as well')
   args = parser.parse_args()
 
   # Make sure the log is parsed
   ensure_parsed(rpgstats)
 
   # Sanity checking and specialized defaults
+  if args.who is None:
+    args.who = []
   if args.quit_strategy is not None:
     if len(comparisons) > 0:
       raise SystemExit("Quit strategy is incompatible with comparisons")
@@ -1312,40 +1326,40 @@ rpgstats.add_log('/home/newren/irclogs/Palantir-yellow/idlerpg.log',
 rpgstats.add_log('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log')
 args = parse_args(rpgstats)
 if 'summary' in args.show:
-  print_summary_info(rpgstats, args.offline)
+  print_summary_info(rpgstats, args.who)
 if 'burninfo' in args.show:
-  print_detailed_burn_info(rpgstats, args.offline)
+  print_detailed_burn_info(rpgstats, args.who)
 if 'attacker' in args.stats:
-  print_attacker_stats(rpgstats, args.offline)
+  print_attacker_stats(rpgstats, args.who)
 if 'item' in args.stats:
-  print_item_stats(rpgstats, args.offline)
+  print_item_stats(rpgstats, args.who)
 if 'quest' in args.stats:
-  print_quest_stats(rpgstats, args.offline)
+  print_quest_stats(rpgstats, args.who)
 if 'light-shining' in args.stats:
-  print_alignment_stats(rpgstats, 0, 'light-shining', 2.0/12, args.offline)
+  print_alignment_stats(rpgstats, 0, 'light-shining', 2.0/12, args.who)
 if 'forsaking' in args.stats:
-  print_alignment_stats(rpgstats, 1, 'forsaking', 1.0/16, args.offline)
+  print_alignment_stats(rpgstats, 1, 'forsaking', 1.0/16, args.who)
 if 'stealing' in args.stats:
-  print_alignment_stats(rpgstats, 2, 'stealing', 1.0/16, args.offline)
+  print_alignment_stats(rpgstats, 2, 'stealing', 1.0/16, args.who)
 if 'godsend-item' in args.stats:
-  print_gch_stats(rpgstats, 0, "item improvement godsends",    1.0/40, args.offline)
+  print_gch_stats(rpgstats, 0, "item improvement godsends",    1.0/40, args.who)
 if 'godsend-time' in args.stats:
-  print_gch_stats(rpgstats, 1, "time acceleration godsends",   9.0/40, args.offline)
+  print_gch_stats(rpgstats, 1, "time acceleration godsends",   9.0/40, args.who)
 if 'calamity-item' in args.stats:
-  print_gch_stats(rpgstats, 2, "item detriment calamities",    1.0/80, args.offline)
+  print_gch_stats(rpgstats, 2, "item detriment calamities",    1.0/80, args.who)
 if 'calamity-time' in args.stats:
-  print_gch_stats(rpgstats, 3, "time deceleration calamities", 9.0/80, args.offline)
+  print_gch_stats(rpgstats, 3, "time deceleration calamities", 9.0/80, args.who)
 if 'hand-of-god' in args.stats:
-  print_gch_stats(rpgstats, 4, "hands of god",                 1.0/20, args.offline)
+  print_gch_stats(rpgstats, 4, "hands of god",                 1.0/20, args.who)
 for who in args.stats_of:
   if who not in rpgstats:
     raise SystemExit("Unrecognized player: "+who)
   print_personal_stats(rpgstats, who)
 if 'levelling' in args.show:
-  print_next_levelling(rpgstats, args.offline)
+  print_next_levelling(rpgstats, args.who)
 if 'plot_levelling' in args.show:
-  plot_levels(rpgstats)
+  plot_levels(rpgstats, args.who)
 if args.quit_strategy:
-  show_quit_strategy(rpgstats, args.quit_strategy.split(','))
+  show_quit_strategy(rpgstats, args.quit_strategy.split(','), args.who)
 if 'flat_slopes' in args.show:
-  show_flat_slopes(rpgstats, args.offline)
+  show_flat_slopes(rpgstats, args.who)
