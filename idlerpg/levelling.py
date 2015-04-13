@@ -62,9 +62,10 @@ class IdlerpgStats(defaultdict):
     super(IdlerpgStats, self).__init__(default_player)
     self.player = {}  # ircnick -> who_string
     self.quest_started = None  # time_string or None
-    self.quest_times = []
+    self.quest_times = defaultdict(list) # quest_positions -> list of times
     self.quest_started = None
     self.quest_time_left = None
+    self.quest_positions = None
     self.questers = []
     self.next_quest = 0
     self.logfiles = []
@@ -162,6 +163,7 @@ class IdlerpgStats(defaultdict):
     # Record that there is no active quest
     self.quest_started = None
     self.quest_time_left = None
+    self.quest_positions = None
     self.questers = []
     self.next_quest = quest_end+wait_period
 
@@ -359,9 +361,11 @@ class IdlerpgStats(defaultdict):
       #
       # Check for quest starting
       #
-      m = re.match("(.*) have been chosen.*Participants must first reach", line)
+      m = re.match("(.*) have been chosen.*Participants must first reach (\[.*?\]).*(\[.*?\])", line)
       if m:
-        self.record_questers(IdlerpgStats.get_people_list(m.group(1)), epoch)
+        quester_list, start_pos, end_pos = m.groups()
+        self.record_questers(IdlerpgStats.get_people_list(quester_list), epoch)
+        self.quest_positions = start_pos+end_pos
         continue
       m = re.match(r"(.*) have been chosen.*Quest to end in (\d+) days?, (\d{2}):(\d{2}):(\d{2})", line)
       if m:
@@ -380,7 +384,7 @@ class IdlerpgStats(defaultdict):
         continue
       m = re.match(r".*completed their journey", line)
       if m:
-        self.quest_times.append(epoch-self.quest_started)
+        self.quest_times[self.quest_positions].append(epoch-self.quest_started)
         self.quest_ended(epoch, successful=True)
         continue
       m = re.match(r".*have blessed the realm by completing their quest", line)
@@ -629,8 +633,10 @@ def quest_info(stats):
              "; Participants: "+','.join(stats.questers)
     else:
       import numpy
-      early = time_format(stats.quest_started+numpy.min(stats.quest_times)-now)
-      likly = time_format(stats.quest_started+numpy.mean(stats.quest_times)-now)
+      min_finish = numpy.min(stats.quest_times[stats.quest_positions])
+      mean_finish = numpy.mean(stats.quest_times[stats.quest_positions])
+      early = time_format(stats.quest_started+min_finish-now)
+      likly = time_format(stats.quest_started+mean_finish-now)
       return "May end in {}; most likely to end in {}".format(early, likly)+\
              "\nParticipants: "+','.join(stats.questers)
   else:
@@ -724,7 +730,9 @@ def quest_burn(stats, who):
     return 0, 0, 0
 
   # Determine average quest duration
-  location_quest_average = sum(stats.quest_times)/len(stats.quest_times)
+  sums = sum(sum(stats.quest_times[x]) for x in stats.quest_times)
+  count = sum(len(stats.quest_times[x]) for x in stats.quest_times)
+  location_quest_average = sums/count
   time_quest_average = 86400*1.5
   average_quest_time = (location_quest_average*12.0+time_quest_average*5.0)/17
 
@@ -1112,9 +1120,9 @@ def show_quit_strategy(stats, quitters, show_who):
         quest_end = stats.quest_started+stats.quest_time_left
         odds = 1 if (quest_end > now+ettl_opt) else 0
       else:
-        num_longer_quests = sum(1.0 for qtime in stats.quest_times
+        num_longer_quests = sum(1.0 for qtime in stats.quest_times[stats.quest_positions]
                                 if stats.quest_started+qtime > now+ettl_opt)
-        odds = num_longer_quests/len(stats.quest_times)
+        odds = num_longer_quests/len(stats.quest_times[stats.quest_positions])
       # If this person might level, include their info
       if odds > 0:
         possible_levellers += " {} ({:.1f}%)".format(who, int(100*odds))
