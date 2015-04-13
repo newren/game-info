@@ -733,7 +733,7 @@ def quest_burn(stats, who):
   sums = sum(sum(stats.quest_times[x]) for x in stats.quest_times)
   count = sum(len(stats.quest_times[x]) for x in stats.quest_times)
   location_quest_average = sums/count
-  time_quest_average = 86400*1.5
+  time_quest_average = 86400*0.75  # Time based quests are 12-24 hours
   average_quest_time = (location_quest_average*12.0+time_quest_average*5.0)/17
 
   # Find various odds of folks a,b,c being involved or not
