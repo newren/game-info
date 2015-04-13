@@ -1172,9 +1172,22 @@ def parse_args(rpgstats):
     comparisons.append(mycopy)
 
   class ParseEndTime(argparse.Action):
+    def parse_time(self, timestr):
+      if timestr == 'now':
+        return current_time
+      elif re.match('^\d{4}-\d{2}-\d{2}(?: [\d:]{8})?$', timestr):
+        return convert_to_epoch(timestr)
+      else:
+        output = subprocess.check_output(['grep',
+                     timestr,
+                     '/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log'])
+        final_line = output.splitlines()[-1]
+        sincedate = final_line[0:19]
+        print "Found {} at {}:\n  {}".format(timestr, sincedate, final_line)
+        return convert_to_epoch(sincedate)
     def __call__(self, parser, namespace, values, option_string=None):
       global now
-      new_time = current_time if values == 'now' else convert_to_epoch(values)
+      new_time = self.parse_time(values)
       old_time, now = now, new_time
       for who in rpgstats:
         if rpgstats[who]['online']:
