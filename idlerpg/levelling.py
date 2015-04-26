@@ -1117,7 +1117,7 @@ def show_quit_strategy(stats, quitters, show_who):
       # optimistic burndown rate
       ettl_opt, ettl_exp = expected_ttl(stats, who)
       if stats.quest_time_left:
-        quest_end = stats.quest_started+stats.quest_time_left
+        quest_end = now+stats.quest_time_left
         odds = 1 if (quest_end > now+ettl_opt) else 0
       else:
         num_longer_quests = sum(1.0 for qtime in stats.quest_times[stats.quest_positions]
