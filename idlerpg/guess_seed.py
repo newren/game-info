@@ -81,7 +81,7 @@ class Random:
       self.seed = (self.a*self.seed+self.c)%self.m
     return (self.seed*value+0.0)/self.m
 
-def check_values(values):
+def check_values(values, hrc=0):
   v = Random()
   def check_value(v):
     assert int((v.seed*1327+0.0)/v.m) == 418
@@ -92,24 +92,28 @@ def check_values(values):
   #    assert v.rand(691200) >= 13
   #  #    raise SystemExit("Failed at {}".format(i))
   #  assert v.rand(115200) < 13
-    assert v.rand(115200, 14368) < 13
+    assert v.rand(115200, 14368+hrc) < 13
     assert v.rand(10, 2) < 1
     assert int(v.rand(6)) == 4
 
     # dlaw [771/877] has challenged trogdor [217/365] in combat and won!
     # Do we get 771?
-    print v.rand(877,86436)
-    for i in xrange(5):  # What if we pretend there were some collisions?
-      print int(v.rand(877))
+    maybe = [int(v.rand(877,86436))]
+    for i in xrange(10):  # What if we pretend there were some collisions?
+      maybe.append(int(v.rand(877)))
+    assert any(x == 771 for x in maybe)
 
   for x in values:
     v.set_seed(x)
     try:
       check_value(v)
     except AssertionError:
-      print "Value {} no good".format(x)
+      print "Value {} (when hrc={}) is no good".format(x, hrc)
+    else:
+      print "Value {} (when hrc={}) works".format(x, hrc)
 
-def compute_possibilities():
+def compute_possibilities(hrc = 0):
+  # hrc == hidden rand() calls, from collisions or whatever
   primary_interval = Random.calculate_interval(418,1327)
   secondary_intervals = Random.initial_subinterval(227, 877, [primary_interval])
   tertiary_intervals = Random.niter_constrained_less(1, 50,
@@ -117,17 +121,21 @@ def compute_possibilities():
   quaternary_intervals = Random.niter_matches(7, 20, tertiary_intervals, 3)
 
   quinary_intervals = Random.niter_constrained_less(13, 115200,
-                                                 quaternary_intervals, 3+14368)
+                                                    quaternary_intervals,
+                                                    3+14368+hrc)
   senary_intervals = Random.niter_constrained_less(1, 10,
-                                                 quinary_intervals, 3+14368+2)
-  septenary_intervals = Random.niter_matches(4, 6, senary_intervals, 3+14368+3)
+                                                   quinary_intervals,
+                                                   3+14368+2+hrc)
+  septenary_intervals = Random.niter_matches(4, 6, senary_intervals,
+                                             3+14368+3+hrc)
 
   for value, camefrom in septenary_intervals:
-    print "Working value found: {}; camefrom: {}".format(value, camefrom)
+    print "Working value for hrc=={} found: {}; camefrom: {}".format(hrc, value, camefrom)
 
 
-check_values([88675141333930, 88730764249721])
-compute_possibilities()
+check_values([88675141333930, 88730764249721], 0)
+check_values([88732726299080], 2)
+compute_possibilities(3)
 raise SystemExit("I quit.")
 
 
