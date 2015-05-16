@@ -95,8 +95,11 @@ def check_values(values):
     assert v.rand(115200, 14368) < 13
     assert v.rand(10, 2) < 1
     assert int(v.rand(6)) == 4
+
+    # dlaw [771/877] has challenged trogdor [217/365] in combat and won!
+    # Do we get 771?
     print v.rand(877,86436)
-    for i in xrange(5):
+    for i in xrange(5):  # What if we pretend there were some collisions?
       print int(v.rand(877))
 
   for x in values:
@@ -106,19 +109,27 @@ def check_values(values):
     except AssertionError:
       print "Value {} no good".format(x)
 
+def compute_possibilities():
+  primary_interval = Random.calculate_interval(418,1327)
+  secondary_intervals = Random.initial_subinterval(227, 877, [primary_interval])
+  tertiary_intervals = Random.niter_constrained_less(1, 50,
+                                                     secondary_intervals, 2)
+  quaternary_intervals = Random.niter_matches(7, 20, tertiary_intervals, 3)
+
+  quinary_intervals = Random.niter_constrained_less(13, 115200,
+                                                 quaternary_intervals, 3+14368)
+  senary_intervals = Random.niter_constrained_less(1, 10,
+                                                 quinary_intervals, 3+14368+2)
+  septenary_intervals = Random.niter_matches(4, 6, senary_intervals, 3+14368+3)
+
+  for value, camefrom in septenary_intervals:
+    print "Working value found: {}; camefrom: {}".format(value, camefrom)
+
+
 check_values([88675141333930, 88730764249721])
-
-#2015-04-09 06:43:42 <idlerpg>   dlaw [771/877] has challenged trogdor [217/365] in combat and won! 1 day, 08:00:44 is removed from dlaw's clock.
-#2015-04-09 06:43:42 <idlerpg>   dlaw reaches next level in 12 days, 00:06:43.
-
-
+compute_possibilities()
 raise SystemExit("I quit.")
-  
 
-primary_interval = Random.calculate_interval(418,1327)
-secondary_intervals = Random.initial_subinterval(227, 877, [primary_interval])
-tertiary_intervals = Random.niter_constrained_less(1, 50, secondary_intervals, 2)
-quaternary_intervals = Random.niter_matches(7, 20, tertiary_intervals, 3)
 
 #2015-04-09 05:43:38 <idlerpg>   Sessile [418/1327] has challenged dlaw [227/877] in combat and won! 1 day, 00:54:47 is removed from Sessile's clock.
 #2015-04-09 05:43:38 <idlerpg>   Sessile reaches next level in 4 days, 10:12:32.
@@ -179,24 +190,6 @@ quaternary_intervals = Random.niter_matches(7, 20, tertiary_intervals, 3)
 #      86436
 #    rand calls later, assuming no collisions.
 
-quinary_intervals = Random.niter_constrained_less(13, 115200, quaternary_intervals, 3+14368)
-senary_intervals = Random.niter_constrained_less(1, 10, quinary_intervals, 3+14368+2)
-septenary_intervals = Random.niter_matches(4, 6, senary_intervals, 3+14368+3)
-
-'''
-eps = sys.float_info.epsilon
-a = 0x5DEECE66D
-c = 0xB
-m = 2**48
-'''
-
-for value, camefrom in septenary_intervals:
-  print "Working value found: {}; camefrom: {}".format(value, camefrom)
-raise SystemExit("I quit.")
-
-#Working value found: 88675141333930; camefrom: (((((88675141333930, 2.1), 3), 14371.1), 14373.1), 14374)
-#Working value found: 88730764249721; camefrom: (((((88730764249721, 2.1), 3), 14371.1), 14373.1), 14374)
-# 4m26.000s
 
 intervals = []
 r = 418
