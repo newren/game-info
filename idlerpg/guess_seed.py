@@ -3,68 +3,122 @@
 import math
 import sys
 
-eps = sys.float_info.epsilon
-a = 0x5DEECE66D
-c = 0xB
-m = 2**48
+class Random:
+  eps = sys.float_info.epsilon
+  a = 0x5DEECE66D
+  c = 0xB
+  m = 2**48
+  seed = None
 
-def calculate_interval(r,p):
-  return [int(math.ceil( (r+0.0)*m/p*(1-5*eps))),
-          int(math.floor((r+1.0)*m/p*(1+5*eps)))]
+  @staticmethod
+  def calculate_interval(r,p):
+    m,eps = Random.m, Random.eps
+    return [int(math.ceil( (r+0.0)*m/p*(1-5*eps))),
+            int(math.floor((r+1.0)*m/p*(1+5*eps)))]
 
-def subinterval_provider(r, p, intervals):
-  new_interval = calculate_interval(r,p)
-  assert new_interval[1] - new_interval[0] > 2*a
-  for interval in intervals:
-    s=interval[0]
-    possibilities = []
-    while s <= interval[1]:
-      map2 = int((a*s+c)%m)
-      if map2 < new_interval[0]:
-        s += 1+int(math.ceil((new_interval[0]  -map2)/a*(1-5*eps)))
+  @staticmethod
+  def initial_subinterval(r, p, intervals):
+    a,c,m,eps = Random.a, Random.c, Random.m, Random.eps
+    new_interval = Random.calculate_interval(r,p)
+    assert new_interval[1] - new_interval[0] > 2*a
+    for interval in intervals:
+      s=interval[0]
+      possibilities = []
+      while s <= interval[1]:
         map2 = int((a*s+c)%m)
-        assert map2-a < new_interval[0]
-        assert map2 > new_interval[0] and map2 < new_interval[1]
-      if map2 > new_interval[1]:
-        s += 1+int(math.ceil((new_interval[0]+m-map2)/a*(1-5*eps)))
-        map2 = int((a*s+c)%m)
-        assert map2-a < new_interval[0]
-        assert map2 > new_interval[0] and map2 < new_interval[1]
-      while map2 < new_interval[1]:
-        yield s, s
-        s += 1
-        map2 += a
+        if map2 < new_interval[0]:
+          s += 1+int(math.ceil((new_interval[0]  -map2)/a*(1-5*eps)))
+          map2 = int((a*s+c)%m)
+          assert map2-a < new_interval[0]
+          assert map2 > new_interval[0] and map2 < new_interval[1]
+        if map2 > new_interval[1]:
+          s += 1+int(math.ceil((new_interval[0]+m-map2)/a*(1-5*eps)))
+          map2 = int((a*s+c)%m)
+          assert map2-a < new_interval[0]
+          assert map2 > new_interval[0] and map2 < new_interval[1]
+        while map2 < new_interval[1]:
+          yield s, s
+          s += 1
+          map2 += a
 
-def calculate_interval_an_rest(r, p, n):
-  interval = calculate_interval(r,p)
-  rest = c
-  an = a
-  for i in xrange(n-1):
-    rest = int((a*rest+c)%m)
-    an = int((a*an)%m)
-  return interval, an, rest
+  @staticmethod
+  def _calculate_interval_an_rest(r, p, n):
+    a,c,m = Random.a,Random.c,Random.m
+    interval = Random.calculate_interval(r,p)
+    rest = c
+    an = a
+    for i in xrange(n-1):
+      rest = int((a*rest+c)%m)
+      an = int((a*an)%m)
+    return interval, an, rest
 
-def niter_matches(r, p, values, n):
-  interval, an, rest = calculate_interval_an_rest(r, p, n)
+  @staticmethod
+  def niter_matches(r, p, values, n):
+    m = Random.m
+    interval, an, rest = Random._calculate_interval_an_rest(r, p, n)
 
-  for s, camefrom in values:
-    map2 = int((an*s+rest)%m)
-    if map2 > interval[0] and map2 < interval[1]:
-      yield s, (camefrom,n)
+    for s, camefrom in values:
+      map2 = int((an*s+rest)%m)
+      if map2 > interval[0] and map2 < interval[1]:
+        yield s, (camefrom,n)
 
-def niter_constrained_less(r, p, values, n):
-  interval, an, rest = calculate_interval_an_rest(r-1, p, n)
+  @staticmethod
+  def niter_constrained_less(r, p, values, n):
+    m = Random.m
+    interval, an, rest = Random._calculate_interval_an_rest(r-1, p, n)
 
-  for s, camefrom in values:
-    map2 = int((an*s+rest)%m)
-    if map2 < interval[1]:
-      yield s, (camefrom,n+.1)
+    for s, camefrom in values:
+      map2 = int((an*s+rest)%m)
+      if map2 < interval[1]:
+        yield s, (camefrom,n+.1)
+
+  def set_seed(self, seed):
+    assert seed < self.m and seed > 0 and seed == int(seed)
+    self.seed = seed
+
+  def rand(self, value, ncalls = 1):
+    for i in xrange(ncalls):
+      self.seed = (self.a*self.seed+self.c)%self.m
+    return (self.seed*value+0.0)/self.m
+
+def check_values(values):
+  v = Random()
+  def check_value(v):
+    assert int((v.seed*1327+0.0)/v.m) == 418
+    assert int(v.rand(877)) == 227
+    assert v.rand(50) < 1
+    assert int(v.rand(20)) == 7
+  #  for i in xrange(14367):
+  #    assert v.rand(691200) >= 13
+  #  #    raise SystemExit("Failed at {}".format(i))
+  #  assert v.rand(115200) < 13
+    assert v.rand(115200, 14368) < 13
+    assert v.rand(10, 2) < 1
+    assert int(v.rand(6)) == 4
+    print v.rand(877,86436)
+    for i in xrange(5):
+      print int(v.rand(877))
+
+  for x in values:
+    v.set_seed(x)
+    try:
+      check_value(v)
+    except AssertionError:
+      print "Value {} no good".format(x)
+
+check_values([88675141333930, 88730764249721])
+
+#2015-04-09 06:43:42 <idlerpg>   dlaw [771/877] has challenged trogdor [217/365] in combat and won! 1 day, 08:00:44 is removed from dlaw's clock.
+#2015-04-09 06:43:42 <idlerpg>   dlaw reaches next level in 12 days, 00:06:43.
+
+
+raise SystemExit("I quit.")
   
 
-primary_interval = calculate_interval(418,1327)
-secondary_intervals = subinterval_provider(227, 877, [primary_interval])
-tertiary_intervals = niter_constrained_less(1, 50, secondary_intervals, 2)
-quaternary_intervals = niter_matches(7, 20, tertiary_intervals, 3)
+primary_interval = Random.calculate_interval(418,1327)
+secondary_intervals = Random.initial_subinterval(227, 877, [primary_interval])
+tertiary_intervals = Random.niter_constrained_less(1, 50, secondary_intervals, 2)
+quaternary_intervals = Random.niter_matches(7, 20, tertiary_intervals, 3)
 
 #2015-04-09 05:43:38 <idlerpg>   Sessile [418/1327] has challenged dlaw [227/877] in combat and won! 1 day, 00:54:47 is removed from Sessile's clock.
 #2015-04-09 05:43:38 <idlerpg>   Sessile reaches next level in 4 days, 10:12:32.
@@ -100,10 +154,34 @@ quaternary_intervals = niter_matches(7, 20, tertiary_intervals, 3)
 #    rand(): choose player
 #    rand(10) < 1: we'll do an item improvement
 #    int(rand(6)) == 4: set of leggings chosen
+#
+#  Post-item improvement rand calls:
+#    There are 1200 self_clock cycles between battles.  Since there are
+#    6+6*#online rand() calls per cycle when no events are triggered and there
+#    are no collisions, that means that there are
+#      7200+7200*#online
+#    rand() calls if there are no events or collisions.  We only had a godsend
+#    event, in particular one which added 3 rand() calls.  So we expect
+#      7203+7200*#online
+#    rand() calls.  We already handled 14368+3 of them.  There were still
+#    2+6*#online calls left in the 172nd cycle.  And then we had 1200-172
+#    cycles left.  Which means:
+#      (14368+3) + (2+6*13) + (1200-172)*(6+6*13) = 100803
+#    calls, and incidentally
+#      7203+7200*13 = 100803
+#    as well.  That brings us to the next battle.  For a battle, the first 3
+#    rand calls select the opponents (first player, second player, should the
+#    2nd player be replaced by $primnick).  The next 2 rand calls are the
+#    rolls.  So, after the godsend stuff we have
+#      (2+6*13) + (1200-172)*(6+6*13) + 3 = 86435
+#    rand calls *before* the one which will roll the next battle.  Stated
+#    another way, the next battle roll will be
+#      86436
+#    rand calls later, assuming no collisions.
 
-quinary_intervals = niter_constrained_less(13, 115200, quaternary_intervals, 3+14368)
-senary_intervals = niter_constrained_less(1, 10, quinary_intervals, 3+14368+2)
-septenary_intervals = niter_matches(4, 6, senary_intervals, 3+14368+3)
+quinary_intervals = Random.niter_constrained_less(13, 115200, quaternary_intervals, 3+14368)
+senary_intervals = Random.niter_constrained_less(1, 10, quinary_intervals, 3+14368+2)
+septenary_intervals = Random.niter_matches(4, 6, senary_intervals, 3+14368+3)
 
 '''
 eps = sys.float_info.epsilon
@@ -115,6 +193,10 @@ m = 2**48
 for value, camefrom in septenary_intervals:
   print "Working value found: {}; camefrom: {}".format(value, camefrom)
 raise SystemExit("I quit.")
+
+#Working value found: 88675141333930; camefrom: (((((88675141333930, 2.1), 3), 14371.1), 14373.1), 14374)
+#Working value found: 88730764249721; camefrom: (((((88730764249721, 2.1), 3), 14371.1), 14373.1), 14374)
+# 4m26.000s
 
 intervals = []
 r = 418
