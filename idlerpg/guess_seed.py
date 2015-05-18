@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import math
+import re
 import sys
 
 class Random:
@@ -78,8 +79,12 @@ class Random:
 
   def rand(self, value, ncalls = 1):
     for i in xrange(ncalls):
-      self.seed = (self.a*self.seed+self.c)%self.m
+      self.seed = int((self.a*self.seed+self.c)%self.m)
     return (self.seed*value+0.0)/self.m
+
+  def drand48(self):
+    self.seed = int((self.a*self.seed+self.c)%self.m)
+    return self.seed
 
 def check_values(values, hrc=0):
   v = Random()
@@ -131,11 +136,44 @@ def compute_possibilities(hrc = 0):
 
   for value, camefrom in septenary_intervals:
     print "Working value for hrc=={} found: {}; camefrom: {}".format(hrc, value, camefrom)
+    check_values([value], hrc)
 
+def count_hops(initial_seed, final_seed):
+  count = 1
+  v = Random()
+  v.set_seed(initial_seed)
+  while v.drand48() != final_seed:
+    count += 1
+  return count
 
+if False:
+  seeds = []
+  with open('channel-logs.txt') as f:
+    for match in re.findall('Rand: ([0-9]+)$', f.read(), flags=re.MULTILINE):
+      seeds.append(int(match))
+  for i in xrange(len(seeds)-1):
+    print "Hops from {:15d} to {:15d}: {:5d}".format(seeds[i], seeds[i+1], count_hops(*seeds[i:i+2]))
+  hops1 = count_hops(39683077794122, 159171233202994)
+  hops2 = count_hops(245341444106138, 132969526621058)
+  raise SystemExit("Hops = {}, {}".format(hops1, hops2))
+
+# No solution when hrc in set(1,4,5)
 check_values([88675141333930, 88730764249721], 0)
 check_values([88732726299080], 2)
-compute_possibilities(3)
+check_values([88759129600895], 3)
+check_values([88832312860209], 6)
+#Working value for hrc==8 found: 88730108276003; camefrom: (((((88730108276003, 2.1), 3), 14379.1), 14381.1), 14382)
+#Value 88730108276003 (when hrc=8) is no good
+#Working value for hrc==9 found: 88723502212290; camefrom: (((((88723502212290, 2.1), 3), 14380.1), 14382.1), 14383)
+#Value 88723502212290 (when hrc=9) is no good
+#Working value for hrc==9 found: 88754264960240; camefrom: (((((88754264960240, 2.1), 3), 14380.1), 14382.1), 14383)
+#Value 88754264960240 (when hrc=9) is no good
+#Working value for hrc==12 found: 88682430352412; camefrom: (((((88682430352412, 2.1), 3), 14383.1), 14385.1), 14386)
+#Value 88682430352412 (when hrc=12) is no good
+#Working value for hrc==13 found: 88685261265828; camefrom: (((((88685261265828, 2.1), 3), 14384.1), 14386.1), 14387)
+#Value 88685261265828 (when hrc=13) is no good
+for hrc in xrange(0,15):
+  compute_possibilities(hrc)
 raise SystemExit("I quit.")
 
 
