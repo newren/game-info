@@ -3,6 +3,7 @@
 import math
 import re
 import sys
+from collections import Counter
 
 class Random:
   eps = sys.float_info.epsilon
@@ -73,6 +74,40 @@ class Random:
         yield s, (camefrom,n)
 
   @staticmethod
+  def nth_call_matches(r, p, n, value):
+    m = Random.m
+    interval, an, rest = Random._calculate_interval_an_rest(r, p, n)
+
+    s = value
+    map2 = int((an*s+rest)%m)
+    if map2 > interval[0] and map2 < interval[1]:
+      return True
+    return False
+
+  @staticmethod
+  def compute_possibilities(matches):
+    calls = Counter()
+    def handle_level(lvl, base_n, value):
+      calls[lvl] += 1
+      if lvl == len(matches):
+        print "Found match: {}".format(value)
+      r, p, base_inc, num_to_do = matches[lvl][1:]
+      for j in xrange(base_n+base_inc, base_n+base_inc+num_to_do):
+        if Random.nth_call_matches(r, p, j, value):
+          handle_level(lvl+1, j, value)
+
+    assert matches[0][0]=='equal' and matches[0][3]==0 and matches[0][4]==1
+    assert matches[1][0]=='equal' and matches[1][3]==1 and matches[1][4]==1
+
+    primary = Random.calculate_interval(matches[0][1],matches[0][2])
+    secondary = Random.initial_subinterval(matches[1][1],matches[1][2],
+                                           [primary])
+    for value, camefrom in secondary:
+      handle_level(2, 1, value)
+    for x in calls:
+      print "Calls to handle_level[{}] = {}".format(x, calls[x])
+
+  @staticmethod
   def niter_constrained_less(r, p, values, n):
     m = Random.m
     interval, an, rest = Random._calculate_interval_an_rest(r-1, p, n)
@@ -94,6 +129,29 @@ class Random:
   def drand48(self):
     self.seed = int((self.a*self.seed+self.c)%self.m)
     return self.seed
+
+#2015-04-18 21:56:39 <idlerpg>   yzhou [352/879] has challenged nebkor [567/581] in combat and lost! 0 days, 15:18:52 is added to yzhou's clock.
+#2015-04-18 21:56:42 <idlerpg>   yzhou reaches next level in 9 days, 18:05:38.
+#2015-04-18 22:56:37 <idlerpg>   j [611/987] has challenged yzhou [770/879] in combat and lost! 0 days, 08:08:03 is added to j's clock.
+#2015-04-18 22:56:37 <idlerpg>   j reaches next level in 3 days, 17:28:34.
+#2015-04-18 23:56:41 <idlerpg>   elijah [34/791] has challenged pef [224/889] in combat and lost! 0 days, 09:07:58 is added to elijah's clock.
+#2015-04-18 23:56:41 <idlerpg>   elijah reaches next level in 3 days, 20:09:35.
+#2015-04-19 00:56:44 <idlerpg>   Sessile [186/1327] has challenged kverdieck [556/693] in combat and lost! 0 days, 09:57:27 is added to Sessile's clock.
+#2015-04-19 00:56:44 <idlerpg>   Sessile reaches next level in 4 days, 13:31:57.
+#2015-04-19 01:23:13 <idlerpg>   j, kelsey, elijah, and yzhou have been chosen by the gods to rescue the beautiful princess Juliet from the grasp of the beast Grabthul. Participants must first reach [167,458], then [325,270].
+
+
+Random.compute_possibilities([['equal',  352,  879, 0,        1],
+                              ['equal',  567,  581, 1,        1],
+                              ['equal',  611,  987, 100805-1, 1],
+                              ['equal',  770,  879, 1,        1],
+                              ['equal',   34,  791, 100805-1, 1],
+                              ['equal',  224,  889, 1,        1],
+                              ['equal',  186, 1327, 100805-1, 1],
+                              ['equal',  556,  693, 1,        1]])
+print "Hello world"
+compute_alternate_possibilities()
+raise SystemExit("I quit")
 
 def count_hops(initial_seed, final_seed):
   count = 1
