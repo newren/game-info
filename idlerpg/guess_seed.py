@@ -10,6 +10,7 @@ class Random:
   c = 0xB
   m = 2**48
   seed = None
+  apower_cache = {}
 
   @staticmethod
   def calculate_interval(r,p):
@@ -44,13 +45,22 @@ class Random:
 
   @staticmethod
   def _calculate_interval_an_rest(r, p, n):
-    a,c,m = Random.a,Random.c,Random.m
     interval = Random.calculate_interval(r,p)
-    rest = c
-    an = a
-    for i in xrange(n-1):
-      rest = int((a*rest+c)%m)
-      an = int((a*an)%m)
+    if n in Random.apower_cache:
+      rest, an = Random.apower_cache[n]
+    else:
+      a,c,m = Random.a,Random.c,Random.m
+      try:
+        calced = max(x for x in Random.apower_cache.keys() if x < n)
+        rest, an = Random.apower_cache[calced]
+      except ValueError:
+        calced = 0
+        rest = c
+        an = a
+      for i in xrange(n-calced):
+        rest = int((a*rest+c)%m)
+        an = int((a*an)%m)
+      Random.apower_cache[n] = (rest, an)
     return interval, an, rest
 
   @staticmethod
