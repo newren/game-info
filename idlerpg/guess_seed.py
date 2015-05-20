@@ -86,6 +86,25 @@ class Random:
     self.seed = int((self.a*self.seed+self.c)%self.m)
     return self.seed
 
+def count_hops(initial_seed, final_seed):
+  count = 1
+  v = Random()
+  v.set_seed(initial_seed)
+  while v.drand48() != final_seed:
+    count += 1
+  return count
+
+if False:
+  seeds = []
+  with open('channel-logs.txt') as f:
+    for match in re.findall('Rand: ([0-9]+)$', f.read(), flags=re.MULTILINE):
+      seeds.append(int(match))
+  for i in xrange(len(seeds)-1):
+    print "Hops from {:15d} to {:15d}: {:5d}".format(seeds[i], seeds[i+1], count_hops(*seeds[i:i+2]))
+  hops1 = count_hops(39683077794122, 159171233202994)
+  hops2 = count_hops(245341444106138, 132969526621058)
+  raise SystemExit("Hops = {}, {}".format(hops1, hops2))
+
 def check_values(values, hrc=0):
   v = Random()
   def check_value(v):
@@ -137,25 +156,6 @@ def compute_possibilities(hrc = 0):
   for value, camefrom in septenary_intervals:
     print "Working value for hrc=={} found: {}; camefrom: {}".format(hrc, value, camefrom)
     check_values([value], hrc)
-
-def count_hops(initial_seed, final_seed):
-  count = 1
-  v = Random()
-  v.set_seed(initial_seed)
-  while v.drand48() != final_seed:
-    count += 1
-  return count
-
-if False:
-  seeds = []
-  with open('channel-logs.txt') as f:
-    for match in re.findall('Rand: ([0-9]+)$', f.read(), flags=re.MULTILINE):
-      seeds.append(int(match))
-  for i in xrange(len(seeds)-1):
-    print "Hops from {:15d} to {:15d}: {:5d}".format(seeds[i], seeds[i+1], count_hops(*seeds[i:i+2]))
-  hops1 = count_hops(39683077794122, 159171233202994)
-  hops2 = count_hops(245341444106138, 132969526621058)
-  raise SystemExit("Hops = {}, {}".format(hops1, hops2))
 
 # No solution when hrc in set(1,4,5)
 check_values([88675141333930, 88730764249721], 0)
