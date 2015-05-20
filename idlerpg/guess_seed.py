@@ -25,7 +25,6 @@ class Random:
     assert new_interval[1] - new_interval[0] > 2*a
     for interval in intervals:
       s=interval[0]
-      possibilities = []
       while s <= interval[1]:
         map2 = int((a*s+c)%m)
         if map2 < new_interval[0]:
