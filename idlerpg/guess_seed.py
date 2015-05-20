@@ -116,13 +116,13 @@ def check_values(values, hrc=0):
   #    assert v.rand(691200) >= 13
   #  #    raise SystemExit("Failed at {}".format(i))
   #  assert v.rand(115200) < 13
-    assert v.rand(115200, 14368+hrc) < 13
+    assert v.rand(115200, 14371-4+hrc) < 13  # -4: four rand() calls above
     assert v.rand(10, 2) < 1
     assert int(v.rand(6)) == 4
 
     # dlaw [771/877] has challenged trogdor [217/365] in combat and won!
     # Do we get 771?
-    maybe = [int(v.rand(877,86436))]
+    maybe = [int(v.rand(877,100810 - 4 - (14371-4) - 2 - 1))]
     for i in xrange(10):  # What if we pretend there were some collisions?
       maybe.append(int(v.rand(877)))
     assert any(x == 771 for x in maybe)
@@ -146,12 +146,12 @@ def compute_possibilities(hrc = 0):
 
   quinary_intervals = Random.niter_constrained_less(13, 115200,
                                                     quaternary_intervals,
-                                                    3+14368+hrc)
+                                                    14371+hrc)
   senary_intervals = Random.niter_constrained_less(1, 10,
                                                    quinary_intervals,
-                                                   3+14368+2+hrc)
+                                                   14371+2+hrc)
   septenary_intervals = Random.niter_matches(4, 6, senary_intervals,
-                                             3+14368+3+hrc)
+                                             14371+3+hrc)
 
   for value, camefrom in septenary_intervals:
     print "Working value for hrc=={} found: {}; camefrom: {}".format(hrc, value, camefrom)
@@ -162,6 +162,12 @@ check_values([88675141333930, 88730764249721], 0)
 check_values([88732726299080], 2)
 check_values([88759129600895], 3)
 check_values([88832312860209], 6)
+check_values([88730108276003], 8)
+check_values([88723502212290, 88754264960240], 9)
+check_values([88682430352412], 12)
+check_values([88685261265828], 13)
+
+
 #Working value for hrc==8 found: 88730108276003; camefrom: (((((88730108276003, 2.1), 3), 14379.1), 14381.1), 14382)
 #Value 88730108276003 (when hrc=8) is no good
 #Working value for hrc==9 found: 88723502212290; camefrom: (((((88723502212290, 2.1), 3), 14380.1), 14382.1), 14383)
@@ -193,17 +199,21 @@ raise SystemExit("I quit.")
 #    Gain : 12%  (7/20)
 #
 #  Rand calls:
-#    The item improvement came at 05:52:15, which at self_clock=3 seconds
-#    per cycle (with some drift) in comparison to 05:43:38 means:
+#    There were four rand() calls left, once the battle numbers were to be
+#    rolled (attacker roll, defender roll, critical strike, gain
+#    percentage), before the next cycle would start.  The item improvement
+#    came at 05:52:15, which at self_clock=3 seconds per cycle (with some
+#    drift) in comparison to 05:43:38 means:
 #        (52*60+15 - (43*60+38))/3.0 = 172.33333333333334
 #    So it was 172 self_clock cycles later.  This occurred during the 172
 #    later cycle, so 171 full cycles and part of the 172nd.  Now, each cycle
 #    has 6+6*#online rand() calls assuming no events trigger and no
-#    collisions, and there were 13 people online at the time.  Also, the check
-#    for godsends is the fourth rand() call in a cycle (for cycle 172), so we
+#    collisions, and there were 13 people online at the time.  Also, in the
+#    cycle with the godsend, there are just 3 rand() calls (hog, team_battle,
+#    calamity) before the godsend rand() call, so we
 #    can compute that after the battle there were (assuming no collisions):
-#        171*(6+6*13) + 4 = 171*84+4 = 14368
-#    calls to rand between the battle rand() calls and the yzhou pants godsend.
+#        4 + 171*(6+6*13) + 3 = 4+171*84+3 = 14371
+#    calls to rand before the yzhou pants godsend.
 #
 #  Item improvement:
 #    godsend odds: rand((4*86400)/$opts{self_clock}) < $online
@@ -217,24 +227,25 @@ raise SystemExit("I quit.")
 #    6+6*#online rand() calls per cycle when no events are triggered and there
 #    are no collisions, that means that there are
 #      7200+7200*#online
-#    rand() calls if there are no events or collisions.  We only had a godsend
-#    event, in particular one which added 3 rand() calls.  So we expect
-#      7203+7200*#online
-#    rand() calls.  We already handled 14368+3 of them.  There were still
+#    rand() calls if there are no events or collisions.  We only had two
+#    events (that we know of): a godsend event which added 3 rand() calls,
+#    and the hourly battle, which added 7 more (the four discussed earlier,
+#    plus choose attacker, choose defender, and choose whether to replace
+#    defender with idlerpg).  So we expect
+#      3+7+7200+7200*#online
+#    rand() calls.  We already handled 14371+4 of them (+4 from item
+#    improvement having four rand calls).  There were still
 #    2+6*#online calls left in the 172nd cycle.  And then we had 1200-172
-#    cycles left.  Which means:
-#      (14368+3) + (2+6*13) + (1200-172)*(6+6*13) = 100803
+#    cycles left, plus the remaining 3 from the next hourly battle choosing
+#    the combatants.  This means:
+#      (14371+4) + (2+6*13) + (1200-172)*(6+6*13) + 3 = 100810
 #    calls, and incidentally
-#      7203+7200*13 = 100803
-#    as well.  That brings us to the next battle.  For a battle, the first 3
-#    rand calls select the opponents (first player, second player, should the
-#    2nd player be replaced by $primnick).  The next 2 rand calls are the
-#    rolls.  So, after the godsend stuff we have
+#      7+3+7200+7200*13 = 100810
+#    as well.  That brings us to the next battle.  If we just wanted to know
+#    the number of calls between the godsend stuff completing and the next
+#    battle roll, we'd just leave off the (14371+4) part and get:
 #      (2+6*13) + (1200-172)*(6+6*13) + 3 = 86435
-#    rand calls *before* the one which will roll the next battle.  Stated
-#    another way, the next battle roll will be
-#      86436
-#    rand calls later, assuming no collisions.
+#    Again, this all assumes no collisions.
 
 
 intervals = []
