@@ -1,9 +1,12 @@
 #!/usr/bin/env python
 
+import functools
 import math
 import re
 import sys
 from collections import Counter
+import multiprocessing
+dir(multiprocessing)
 
 class Random:
   eps = sys.float_info.epsilon
@@ -39,7 +42,7 @@ class Random:
           assert map2-a < new_interval[0]
           assert map2 > new_interval[0] and map2 < new_interval[1]
         while map2 < new_interval[1]:
-          yield s, s
+          yield s, 1, s
           s += 1
           map2 += a
 
@@ -83,6 +86,59 @@ class Random:
     if map2 > interval[0] and map2 < interval[1]:
       return True
     return False
+
+  @staticmethod
+  def foobar(r, p, n, extran, values):
+    m = Random.m
+
+    for s, prev_n, camefrom in values:
+      for j in xrange(extran):
+        cur_n = prev_n+n+j
+        interval, an, rest = Random._calculate_interval_an_rest(r, p, cur_n)
+        map2 = int((an*s+rest)%m)
+        if map2 > interval[0] and map2 < interval[1]:
+          yield s, cur_n, (camefrom,cur_n)
+
+  @staticmethod
+  def compute_possibles(matches):
+    sentinel = 'DONE'
+    def execute(func, input_queue, output_queues):
+      for result in func(iter(input_queue.get, sentinel)):
+        for output in output_queues:
+          output.put(result)
+      for output in output_queues:
+        output.put(sentinel)
+
+    assert matches[0][0]=='equal' and matches[0][3]==0 and matches[0][4]==1
+    assert matches[1][0]=='equal' and matches[1][3]==1 and matches[1][4]==1
+
+    qs = []
+    for i in xrange(len(matches)):
+      qs.append(multiprocessing.Queue())
+      pass
+    primary = Random.calculate_interval(matches[0][1],matches[0][2])
+    qs[0].put(primary)
+    qs[0].put(sentinel)
+    ps = []
+    proc = multiprocessing.Process(target=functools.partial(
+                            execute,
+                            functools.partial(Random.initial_subinterval,
+                                              matches[1][1], matches[1][2]),
+                            qs[0], [qs[1]]))
+    proc.start()
+    ps.append(proc)
+    for i in xrange(2,len(matches)):
+      style, r, p, n, extra_n = matches[i]
+      proc = multiprocessing.Process(target=functools.partial(
+                              execute,
+                              functools.partial(Random.foobar,
+                                                r, p, n, extra_n),
+                              qs[i-1], [qs[i]]))
+      proc.start()
+      ps.append(proc)
+    for item in iter(qs[len(matches)-1].get, sentinel):
+      print item
+
 
   @staticmethod
   def compute_possibilities(matches):
@@ -140,6 +196,15 @@ class Random:
 #2015-04-19 00:56:44 <idlerpg>   Sessile reaches next level in 4 days, 13:31:57.
 #2015-04-19 01:23:13 <idlerpg>   j, kelsey, elijah, and yzhou have been chosen by the gods to rescue the beautiful princess Juliet from the grasp of the beast Grabthul. Participants must first reach [167,458], then [325,270].
 
+Random.compute_possibles([['equal',  352,  879, 0,        1],
+                              ['equal',  567,  581, 1,        1],
+                              ['equal',  611,  987, 100805-1, 1],
+                              ['equal',  770,  879, 1,        1],
+                              ['equal',   34,  791, 100805-1, 1],
+                              ['equal',  224,  889, 1,        1],
+                              ['equal',  186, 1327, 100805-1, 1],
+                              ['equal',  556,  693, 1,        1]])
+raise SystemExit("done.")
 
 Random.compute_possibilities([['equal',  352,  879, 0,        1],
                               ['equal',  567,  581, 1,        1],
