@@ -636,7 +636,7 @@ def quest_info(stats):
     if stats.quest_time_left: # Time-based quest
       return "Will end in "+time_format(stats.quest_time_left)+\
              "; Participants: "+','.join(stats.questers)
-    else:
+    elif len(stats.quest_times[stats.quest_positions]) > 0:
       import numpy
       min_finish = numpy.min(stats.quest_times[stats.quest_positions])
       mean_finish = numpy.mean(stats.quest_times[stats.quest_positions])
@@ -644,6 +644,9 @@ def quest_info(stats):
       likly = time_format(stats.quest_started+mean_finish-now)
       return "May end in {}; most likely to end in {}".format(early, likly)+\
              "\nParticipants: "+','.join(stats.questers)
+    else:
+      return "No statistics for this quest type available"+\
+             "; Participants: "+','.join(stats.questers)
   else:
     next_start = time_format(stats.next_quest-now)
     return "None; next should start in "+next_start
