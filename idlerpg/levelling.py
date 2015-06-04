@@ -282,7 +282,10 @@ class IdlerpgStats(defaultdict):
       def next(self):
         while True:
           line = super(FileReplacement, self).next()
-          if re.search(r'(?:BEGIN|ENDING) LOGGING AT', line):
+          # Ignore log open/closed for these supplemental files; note
+          # that the primary file doesn't specify a translate_you, so
+          # it won't be skipped for that file.
+          if re.match(r'--- Log (?:opened|closed)', line):
             continue
           return re.sub(r'\bYou\b', self.replacement_text, line)
 
@@ -297,15 +300,15 @@ class IdlerpgStats(defaultdict):
       for line in logfile:
         epoch_re = r'(?P<epoch>[\d-]{10} [\d:]{8})'
         m = re.match(epoch_re+r' \*\s*(\S* has (?:quit|left))', line) or \
-            re.match(epoch_re+" <idlerpg>\t(.*)$", line) or \
-            re.match(epoch_re+" -idlerpg-\t(.*)$", line) or \
-            re.match(epoch_re+"-idlerpg\([^\)]*\)- (.*)$", line)
+            re.match(epoch_re+"\s?<@?idlerpg>\s(.*)$", line) or \
+            re.match(epoch_re+"-idlerpg\([^\)]*\)- (.*)$", line) or \
+            re.match(epoch_re+"-!- (.* \[.*\] has quit.*)", line)
         if m:
           epoch = convert_to_epoch(m.group('epoch'))
           rest = m.group(2)
           return epoch, rest
 
-        m = re.match(r'\*\*\*\* (?:BEGIN|ENDING) LOGGING AT (.*)', line)
+        m = re.match(r'--- Log (?:opened|closed) (.*)', line)
         if m:
           ed = m.group(1)
           timetuple = datetime.strptime(ed, '%a %b %d %H:%M:%S %Y').timetuple()
@@ -352,7 +355,7 @@ class IdlerpgStats(defaultdict):
         continue
 
       # I got disconnected somehow
-      m = re.match(r'\*\*\*\* ENDING LOGGING AT (.*)', line)
+      m = re.match(r'--- Log closed (.*)', line)
       if m:
         for who in self:
           if self[who]['online'] != None:
@@ -1337,16 +1340,15 @@ def parse_args(rpgstats):
 
 
 rpgstats = IdlerpgStats()
-rpgstats.add_log('/home/newren/.xchat2/xchatlogs/Palantir-idlerpg.log',
-                 translate_you='elijah')
-rpgstats.add_log('/home/newren/irclogs/Palantir/idlerpg.log',
-                 translate_you='elijah')
 os.system('rsync -a pt-scm-staging-01:irclogs/Palantir/ /home/newren/irclogs/Palantir-yellow/')
-rpgstats.add_log('/home/newren/irclogs/Palantir-yellow/idlerpg.log',
-                 translate_you='Atychiphobe')
-# We want 'You found a level X <item>!' messages to come before the 'Y has attained level Z!'
-# messages, so we list the main log after the other logs
-rpgstats.add_log('/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log')
+#rpgstats.add_log('/home/newren/irclogs/Palantir-yellow/idlerpg.log',
+#                 translate_you='Atychiphobe')
+os.system('rsync -a gerrit-ro@pt-scm-staging-01:irclogs/Palantir/ /home/newren/irclogs/Palantir-elijah/')
+rpgstats.add_log('/home/newren/irclogs/Palantir-elijah/idlerpg.log',
+                 translate_you='elijah')
+# We want 'You found a level X <item>!' messages to come before the
+# 'Y has attained level Z!' messages, so we list the main log last
+rpgstats.add_log('/home/newren/irclogs/Palantir-elijah/#idlerpg.log')
 args = parse_args(rpgstats)
 if 'summary' in args.show:
   print_summary_info(rpgstats, args.who)
