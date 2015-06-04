@@ -69,6 +69,7 @@ class IdlerpgStats(defaultdict):
     self.questers = []
     self.next_quest = 0
     self.logfiles = []
+    self.primary_log = None
     self.last_lines = []
     self.last_epoch_and_line = None
     self.levels = defaultdict(list)
@@ -289,6 +290,7 @@ class IdlerpgStats(defaultdict):
       self.logfiles.append(FileReplacement(translate_you, filename))
     else:
       self.logfiles.append(open(filename))
+    self.primary_log = filename
 
   def next_line(self):
     def get_next_epoch_and_line(logfile):
@@ -1187,8 +1189,8 @@ def parse_args(rpgstats):
         return convert_to_epoch(timestr)
       else:
         output = subprocess.check_output(['grep',
-                     timestr,
-                     '/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log'])
+                                          timestr,
+                                          rpgstats.primary_log])
         final_line = output.splitlines()[-1]
         sincedate = final_line[0:19]
         print "Found {} at {}:\n  {}".format(timestr, sincedate, final_line)
