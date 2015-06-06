@@ -1344,14 +1344,14 @@ def parse_args(rpgstats):
 
 rpgstats = IdlerpgStats()
 os.system('rsync -a pt-scm-staging-01:irclogs/Palantir/ /home/newren/irclogs/Palantir-yellow/')
-#rpgstats.add_log('/home/newren/irclogs/Palantir-yellow/idlerpg.log',
-#                 translate_you='Atychiphobe')
-os.system('rsync -a gerrit-ro@pt-scm-staging-01:irclogs/Palantir/ /home/newren/irclogs/Palantir-elijah/')
-rpgstats.add_log('/home/newren/irclogs/Palantir-elijah/idlerpg.log',
+rpgstats.add_log('/home/newren/irclogs/Palantir-yellow/idlerpg.log',
+                 translate_you='Atychiphobe')
+#os.system('rsync -a gerrit-ro@pt-scm-staging-01:irclogs/Palantir/ /home/newren/irclogs/Palantir-elijah/')
+rpgstats.add_log('/home/newren/irclogs/Palantir/idlerpg.log',
                  translate_you='elijah')
 # We want 'You found a level X <item>!' messages to come before the
 # 'Y has attained level Z!' messages, so we list the main log last
-rpgstats.add_log('/home/newren/irclogs/Palantir-elijah/#idlerpg.log')
+rpgstats.add_log('/home/newren/irclogs/Palantir/#idlerpg.log')
 args = parse_args(rpgstats)
 if 'summary' in args.show:
   print_summary_info(rpgstats, args.who)

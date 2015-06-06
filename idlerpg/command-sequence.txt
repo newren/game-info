@@ -1,10 +1,10 @@
-grep 'stole ' ~/.xchat2/xchatlogs/Palantir-#idlerpg.log | less
-grep -h made\ to\ steal ~/.xchat2/xchatlogs/Palantir-idlerpg.log ~/irclogs/Palantir/idlerpg.log | less
+grep 'stole ' ~/irclogs/Palantir/#idlerpg.log | less
+grep -h made\ to\ steal ~/irclogs/Palantir/idlerpg.log | less
 ssh pt-scm-staging-01 grep '"made to steal"' irclogs/Palantir/idlerpg.log | tail -n 10 | less
-grep '10%.*effectiveness' ~/.xchat2/xchatlogs/Palantir-#idlerpg.log | tail -n 10 | less
-grep fierce  ~/.xchat2/xchatlogs/Palantir-#idlerpg.log | tail -n 10 | less
+grep '10%.*effectiveness' ~/irclogs/Palantir/#idlerpg.log | tail -n 10 | less
+grep fierce  ~/irclogs/Palantir/#idlerpg.log | tail -n 10 | less
 eval $(grep -A 1 'latest battle' ~/notes/irc-hipchat-idlerpg/idlerpg/idlerpg.txt | tail -n 1) | less
 eval $(grep -A 1 -m 2 'has attained' ~/notes/irc-hipchat-idlerpg/idlerpg/idlerpg.txt | head -n 2 | tail -n 1) | less
-#grep '[A-Za-z]* reaches next level in .*' ~/.xchat2/xchatlogs/Palantir-#idlerpg.log | awk '{nxt[$4]=$0} END{for (x in nxt){print nxt[x]}}' | sort -k 9 -n | less
-grep alignment ~/.xchat2/xchatlogs/Palantir-#idlerpg.log | awk '{print $(NF-5) " => " $NF'} | less
+#grep '[A-Za-z]* reaches next level in .*' ~/irclogs/Palantir/#idlerpg.log | awk '{nxt[$4]=$0} END{for (x in nxt){print nxt[x]}}' | sort -k 9 -n | less
+grep alignment ~/irclogs/Palantir/#idlerpg.log | awk '{print $(NF-5) " => " $NF'} | less
 ./levelling.py | less

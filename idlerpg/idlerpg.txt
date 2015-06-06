@@ -4,18 +4,18 @@ Determining whether my strategies are working:
   # adjustments being a good backup.  As of 03-13, j & kniktas were leading me
 
 Determining what battle-adjusted itemsums folks have used over time:
-   cat ~/.xchat2/xchatlogs/Palantir-#idlerpg.log | grep -v 'team battled' | grep -o '[A-Za-z0-9]* \[[0-9/]*\]' | sort -k 1,1 -s | sed -e s#[0-9]*/## | uniq -c | less
+   cat ~/irclogs/Palantir/#idlerpg.log | grep -v 'team battled' | grep -o '[A-Za-z0-9]* \[[0-9/]*\]' | sort -k 1,1 -s | sed -e s#[0-9]*/## | uniq -c | less
 
 Determining the latest battle-adjusted itemsums folks are now using:
-   cat ~/.xchat2/xchatlogs/Palantir-#idlerpg.log | grep -v 'team battled' | grep -o '[A-Za-z0-9]* \[[0-9/]*\]' | sort -k 1,1 -s | sed -e s#[0-9]*/## | tr -d '[]' | uniq -c | awk '{cnt[$2]=$3} END{for (x in cnt){print cnt[x],x}}' | sort -n | less
+   cat ~/irclogs/Palantir/#idlerpg.log | grep -v 'team battled' | grep -o '[A-Za-z0-9]* \[[0-9/]*\]' | sort -k 1,1 -s | sed -e s#[0-9]*/## | tr -d '[]' | uniq -c | awk '{cnt[$2]=$3} END{for (x in cnt){print cnt[x],x}}' | sort -n | less
 
 Determining what level everyone has attained:
-   grep 'has attained' ~/.xchat2/xchatlogs/Palantir-#idlerpg.log | sed -e 's/.*idlerpg>\s*//' -e 's/,[^,]*, has attained//' -e 's/!.*//' | awk '{cnt[$1]=$3} END{for (x in cnt){print cnt[x],x}}' | sort -n | less
+   grep 'has attained' ~/irclogs/Palantir/#idlerpg.log | sed -e 's/.*idlerpg>\s*//' -e 's/,[^,]*, has attained//' -e 's/!.*//' | awk '{cnt[$1]=$3} END{for (x in cnt){print cnt[x],x}}' | sort -n | less
 
 Determining alignment; combination of (the first only goes back to when my logs started)
-   grep alignment ~/.xchat2/xchatlogs/Palantir-#idlerpg.log | awk '{print $5 " => " $10'} | less
-   grep forsaken ~/.xchat2/xchatlogs/Palantir-#idlerpg.log | awk {print\$5} | sort | uniq -c
-   grep prayed ~/.xchat2/xchatlogs/Palantir-#idlerpg.log | sed -e 's/.*[^A-Za-z]\([A-Za-z].*\) and \(.*\) have not let.*/\1 \2/' | tr ' ' '\n' | sort | uniq -c
+   grep alignment ~/irclogs/Palantir/#idlerpg.log | awk '{print $5 " => " $10'} | less
+   grep forsaken ~/irclogs/Palantir/#idlerpg.log | awk {print\$5} | sort | uniq -c
+   grep prayed ~/irclogs/Palantir/#idlerpg.log | sed -e 's/.*[^A-Za-z]\([A-Za-z].*\) and \(.*\) have not let.*/\1 \2/' | tr ' ' '\n' | sort | uniq -c
    
 
 grep '<idlerpg>' ~/.xchat2/xchatlogs/Palantir-#idlerpg.log | grep -v -e 'has come upon' -e 'Critical Strike' -e 'has challenged .* in combat' -e 'has attained level' -e 'uest to end' -e 'reaches next level' -e 'Next level in' -e 'This terrible calamity' -e 'This wondrous godsend' -e 'completing their quest' -e 'Idle RPG Top Players' -e 'have team battled' -e 'completed their journey' -e '10%.* effectiveness' -e 'have been chosen by the gods' -e 'In the fierce battle' -e 'blessed hand of God' -e 'prayed to their god' -e 'His little finger among them' -e 'prudence and self-regard' 
