@@ -79,7 +79,7 @@ class Random:
         calced = max(x for x in Random.apower_cache.keys() if x < n)
         rest, an = Random.apower_cache[calced]
       except ValueError:
-        calced = 0
+        calced = 1
         rest = c
         an = a
       for i in xrange(n-calced):
