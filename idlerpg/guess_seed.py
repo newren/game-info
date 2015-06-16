@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 import functools
+import itertools
+import operator
 import math
 import re
 import sys
@@ -41,7 +43,7 @@ class Random:
           assert map2-a < new_interval[0]
           assert map2 > new_interval[0] and map2 < new_interval[1]
         while map2 < new_interval[1]:
-          yield s, s
+          yield s, 1, s
           s += 1
           map2 += a
 
@@ -66,14 +68,41 @@ class Random:
     return interval, an, rest
 
   @staticmethod
-  def niter_matches(r, p, values, n):
-    m = Random.m
-    interval, an, rest = Random._calculate_interval_an_rest(r, p, n)
+  def _calculate_an_rest(n):
+    if n in Random.apower_cache:
+      rest, an = Random.apower_cache[n]
+    else:
+      a,c,m = Random.a,Random.c,Random.m
+      try:
+        calced = max(x for x in Random.apower_cache.keys() if x < n)
+        rest, an = Random.apower_cache[calced]
+      except ValueError:
+        calced = 0
+        rest = c
+        an = a
+      for i in xrange(n-calced):
+        rest = int((a*rest+c)%m)
+        an = int((a*an)%m)
+      Random.apower_cache[n] = (rest, an)
+    return an, rest
 
-    for s, camefrom in values:
-      map2 = int((an*s+rest)%m)
-      if map2 > interval[0] and map2 < interval[1]:
-        yield s, (camefrom,n)
+  @staticmethod
+  def niter_matches(r, p, values, min_rands, num_to_do):
+    m = Random.m
+    interval = Random.calculate_interval(r,p)
+
+    nextvalues = list(itertools.islice(values, 512))
+    while nextvalues:
+      for prev_n, grouped_values in itertools.groupby(nextvalues,
+                                                      operator.itemgetter(1)):
+        for n in xrange(prev_n + min_rands, prev_n + min_rands + num_to_do):
+          an, rest = Random._calculate_an_rest(n)
+          lastn = prev_n
+          for s, prev_n, camefrom in grouped_values:
+            map2 = int((an*s+rest)%m)
+            if map2 > interval[0] and map2 < interval[1]:
+              yield s, n, (camefrom,n)
+      nextvalues = list(itertools.islice(values, 512))
 
   @staticmethod
   def nth_call_matches(r, p, n, value):
@@ -219,10 +248,14 @@ for pair in zip(randcounts, randcounts[1:]):
 def faster_compute():
   primary_interval = Random.calculate_interval(81,35300)
   secondary_intervals = Random.initial_subinterval(367, 439, [primary_interval])
+  #tertiary_intervals = Random.niter_matches(312, 439,
+  #                                          secondary_intervals, 21606)
+  #quaternary_intervals = Random.niter_matches(254, 440,
+  #                                            tertiary_intervals, 21606+1)
   tertiary_intervals = Random.niter_matches(312, 439,
-                                            secondary_intervals, 21606)
+                                            secondary_intervals, 21606-1, 1)
   quaternary_intervals = Random.niter_matches(254, 440,
-                                              tertiary_intervals, 21606+1)
+                                              tertiary_intervals, 1, 1)
   if False:
     quinary_intervals = Random.niter_matches(104, 353,
                                              quaternary_intervals, 43214)
@@ -244,7 +277,7 @@ def slower_compute():
                                 #['equal',  303,  353, 21606-2,  1],
                                 #['equal',  176,  439, 1,        1]])
 
-fast = False
+fast = True
 if fast:
   print(len(list(faster_compute())))
 else:
