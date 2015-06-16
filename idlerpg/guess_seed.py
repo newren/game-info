@@ -39,6 +39,8 @@ class Random:
           assert map2 > new_interval[0] and map2 < new_interval[1]
         if map2 > new_interval[1]:
           s += 1+int(math.ceil((new_interval[0]+m-map2)/a*(1-5*eps)))
+          if s > interval[1]:
+            return
           map2 = int((a*s+c)%m)
           assert map2-a < new_interval[0]
           assert map2 > new_interval[0] and map2 < new_interval[1]
@@ -91,17 +93,24 @@ class Random:
     m = Random.m
     interval = Random.calculate_interval(r,p)
 
+    # Work on a set of values at a time
     nextvalues = list(itertools.islice(values, 512))
     while nextvalues:
+      # Each item in the list is of the form (s, n, camefrom), we want to
+      # group these by same values of n to avoid recalculation of an & rest
       for prev_n, grouped_values in itertools.groupby(nextvalues,
                                                       operator.itemgetter(1)):
+        # Determine the number, n, of rand rolls we are checking
         for n in xrange(prev_n + min_rands, prev_n + min_rands + num_to_do):
+          # Calculate (a^n % m) and (sum_i=0^n a^i*c)%m
           an, rest = Random._calculate_an_rest(n)
-          lastn = prev_n
-          for s, prev_n, camefrom in grouped_values:
+          # Iterate over grouped values (guaranteed prevn == prev_n)
+          for s, prevn, camefrom in grouped_values:
+            # Check whether this value works
             map2 = int((an*s+rest)%m)
             if map2 > interval[0] and map2 < interval[1]:
               yield s, n, (camefrom,n)
+      # Get the next set of values to work on
       nextvalues = list(itertools.islice(values, 512))
 
   @staticmethod
@@ -227,12 +236,6 @@ def count_hops(initial_seed, final_seed):
     count += 1
   return count
 
-randcounts=[224491502306380, 126166889533354, 265930535560594, 277450753605568]
-for pair in zip(randcounts, randcounts[1:]):
-  print(pair)
-  print "Hops: {}, 3-after: {}".format(count_hops(pair[0], pair[1]),
-                                       calc_rand48(pair[0], 3))
-
 #<idlerpg> Rand: 224491502306380
 #<idlerpg> newren [81/353] has challenged other [367/439] in combat and lost! 0 days, 06:19:44 is added to newren's clock.
 #<idlerpg> newren reaches next level in 4 days, 00:44:39.
@@ -245,27 +248,40 @@ for pair in zip(randcounts, randcounts[1:]):
 #<idlerpg> Rand: 277450753605568
 #<idlerpg> newren [303/353] has challenged other [176/439] in combat and won! 0 days, 10:22:48 is removed from newren's clock.
 #<idlerpg> newren reaches next level in 3 days, 11:59:02.
+
+randcounts=[224491502306380, 126166889533354, 265930535560594, 277450753605568]
+for pair in zip(randcounts, randcounts[1:]):
+  print(pair)
+  print "Hops: {}, 3-after: {}".format(count_hops(pair[0], pair[1]),
+                                       calc_rand48(pair[0], 3))
+v = Random()
+v.set_seed(224491502306380)
+assert  81 == int(v.rand(353, 3)); print(v.seed)
+assert 367 == int(v.rand(439, 1)); print(v.seed)
+assert 312 == int(v.rand(439, 21606-1)); print(v.seed)
+assert 254 == int(v.rand(440, 1)); print(v.seed)
+assert 104 == int(v.rand(353, 21608-1)); print(v.seed)
+assert 386 == int(v.rand(440, 1)); print(v.seed)
+assert 303 == int(v.rand(353, 21606-1)); print(v.seed)
+assert 176 == int(v.rand(439, 1)); print(v.seed)
+print "Basic checks passed"
+
 def faster_compute():
-  primary_interval = Random.calculate_interval(81,35300)
+  primary_interval = Random.calculate_interval(81,353)
   secondary_intervals = Random.initial_subinterval(367, 439, [primary_interval])
-  #tertiary_intervals = Random.niter_matches(312, 439,
-  #                                          secondary_intervals, 21606)
-  #quaternary_intervals = Random.niter_matches(254, 440,
-  #                                            tertiary_intervals, 21606+1)
   tertiary_intervals = Random.niter_matches(312, 439,
-                                            secondary_intervals, 21606-1, 1)
+                                            secondary_intervals, 21606-1, 2)
   quaternary_intervals = Random.niter_matches(254, 440,
-                                              tertiary_intervals, 1, 1)
-  if False:
-    quinary_intervals = Random.niter_matches(104, 353,
-                                             quaternary_intervals, 43214)
-    senary_intervals = Random.niter_matches(386, 440,
-                                            quinary_intervals, 43214+1)
-    septenary_intervals = Random.niter_matches(303, 353,
-                                               senary_intervals, 64820)
-    octenary_intervals = Random.niter_matches(176, 439,
-                                              septenary_intervals, 64820+1)
-  return quaternary_intervals
+                                              tertiary_intervals, 1, 2)
+  quinary_intervals = Random.niter_matches(104, 353,
+                                           quaternary_intervals, 21608-1, 2)
+  senary_intervals = Random.niter_matches(386, 440,
+                                          quinary_intervals, 1, 2)
+  septenary_intervals = Random.niter_matches(303, 353,
+                                             senary_intervals, 21606-1, 1)
+  octenary_intervals = Random.niter_matches(176, 439,
+                                            septenary_intervals, 1, 2)
+  return octenary_intervals
 
 def slower_compute():
   Random.compute_possibilities([['equal',   81,  35300, 0,        1],
@@ -279,7 +295,7 @@ def slower_compute():
 
 fast = True
 if fast:
-  print(len(list(faster_compute())))
+  print(list(faster_compute()))
 else:
   slower_compute()
 raise SystemExit("done.")
