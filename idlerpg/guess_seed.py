@@ -6,7 +6,6 @@ import re
 import sys
 from collections import Counter
 import multiprocessing
-dir(multiprocessing)
 
 class Random:
   eps = sys.float_info.epsilon
