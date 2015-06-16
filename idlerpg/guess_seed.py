@@ -29,8 +29,8 @@ class Random:
     assert new_interval[1] - new_interval[0] > 2*a
     for interval in intervals:
       s=interval[0]
+      map2 = int((a*s+c)%m)
       while s <= interval[1]:
-        map2 = int((a*s+c)%m)
         if map2 < new_interval[0]:
           s += 1+int(math.ceil((new_interval[0]  -map2)/a*(1-5*eps)))
           map2 = int((a*s+c)%m)
@@ -42,7 +42,7 @@ class Random:
           assert map2-a < new_interval[0]
           assert map2 > new_interval[0] and map2 < new_interval[1]
         while map2 < new_interval[1]:
-          yield s, 1, s
+          yield s, s
           s += 1
           map2 += a
 
@@ -147,6 +147,7 @@ class Random:
       calls[lvl] += 1
       if lvl == len(matches):
         print "Found match: {}".format(value)
+        return
       r, p, base_inc, num_to_do = matches[lvl][1:]
       for j in xrange(base_n+base_inc, base_n+base_inc+num_to_do):
         if Random.nth_call_matches(r, p, j, value):
@@ -186,6 +187,71 @@ class Random:
     self.seed = int((self.a*self.seed+self.c)%self.m)
     return self.seed
 
+def calc_rand48(seed, ntimes):
+  for i in xrange(ntimes):
+    seed = int((Random.a*seed+Random.c)%Random.m)
+  return seed
+def count_hops(initial_seed, final_seed):
+  count = 1
+  v = Random()
+  v.set_seed(initial_seed)
+  while v.drand48() != final_seed:
+    count += 1
+  return count
+
+randcounts=[224491502306380, 126166889533354, 265930535560594, 277450753605568]
+for pair in zip(randcounts, randcounts[1:]):
+  print(pair)
+  print "Hops: {}, 3-after: {}".format(count_hops(pair[0], pair[1]),
+                                       calc_rand48(pair[0], 3))
+
+#<idlerpg> Rand: 224491502306380
+#<idlerpg> newren [81/353] has challenged other [367/439] in combat and lost! 0 days, 06:19:44 is added to newren's clock.
+#<idlerpg> newren reaches next level in 4 days, 00:44:39.
+#<idlerpg> Rand: 126166889533354
+#<idlerpg> other [312/439] has challenged idlerpg [254/440] in combat and won! 0 days, 07:25:49 is removed from other's clock.
+#<idlerpg> other reaches next level in 1 day, 05:43:16.
+#<idlerpg> Rand: 265930535560594
+#<idlerpg> newren [104/353] has challenged idlerpg [386/440] in combat and lost! 0 days, 08:40:10 is added to newren's clock.
+#<idlerpg> newren reaches next level in 3 days, 23:21:56.
+#<idlerpg> Rand: 277450753605568
+#<idlerpg> newren [303/353] has challenged other [176/439] in combat and won! 0 days, 10:22:48 is removed from newren's clock.
+#<idlerpg> newren reaches next level in 3 days, 11:59:02.
+def faster_compute():
+  primary_interval = Random.calculate_interval(81,35300)
+  secondary_intervals = Random.initial_subinterval(367, 439, [primary_interval])
+  tertiary_intervals = Random.niter_matches(312, 439,
+                                            secondary_intervals, 21606)
+  quaternary_intervals = Random.niter_matches(254, 440,
+                                              tertiary_intervals, 21606+1)
+  if False:
+    quinary_intervals = Random.niter_matches(104, 353,
+                                             quaternary_intervals, 43214)
+    senary_intervals = Random.niter_matches(386, 440,
+                                            quinary_intervals, 43214+1)
+    septenary_intervals = Random.niter_matches(303, 353,
+                                               senary_intervals, 64820)
+    octenary_intervals = Random.niter_matches(176, 439,
+                                              septenary_intervals, 64820+1)
+  return quaternary_intervals
+
+def slower_compute():
+  Random.compute_possibilities([['equal',   81,  35300, 0,        1],
+                                ['equal',  367,  439, 1,        1],
+                                ['equal',  312,  439, 21606-1,  1],
+                                ['equal',  254,  440, 1,        1]]) #,
+                                #['equal',  104,  353, 21608-2,  1],
+                                #['equal',  386,  440, 1,        1],
+                                #['equal',  303,  353, 21606-2,  1],
+                                #['equal',  176,  439, 1,        1]])
+
+fast = False
+if fast:
+  print(len(list(faster_compute())))
+else:
+  slower_compute()
+raise SystemExit("done.")
+
 #2015-04-18 21:56:39 <idlerpg>   yzhou [352/879] has challenged nebkor [567/581] in combat and lost! 0 days, 15:18:52 is added to yzhou's clock.
 #2015-04-18 21:56:42 <idlerpg>   yzhou reaches next level in 9 days, 18:05:38.
 #2015-04-18 22:56:37 <idlerpg>   j [611/987] has challenged yzhou [770/879] in combat and lost! 0 days, 08:08:03 is added to j's clock.
@@ -217,14 +283,6 @@ Random.compute_possibilities([['equal',  352,  879, 0,        1],
 print "Hello world"
 compute_alternate_possibilities()
 raise SystemExit("I quit")
-
-def count_hops(initial_seed, final_seed):
-  count = 1
-  v = Random()
-  v.set_seed(initial_seed)
-  while v.drand48() != final_seed:
-    count += 1
-  return count
 
 if False:
   seeds = []
