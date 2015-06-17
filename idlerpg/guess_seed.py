@@ -115,6 +115,36 @@ class Random:
       nextvalues = list(itertools.islice(values, 512))
 
   @staticmethod
+  def niter_constrained_less(r, p, values, min_rands, num_to_do):
+    # The ONLY differences between niter_matches and niter_constrained_less
+    # are:
+    #   1) interval calculated with r-1
+    #   2) the if-condition check on the map2 value
+    m = Random.m
+    interval = Random.calculate_interval(r-1,p)
+
+    # Work on a set of values at a time
+    nextvalues = list(itertools.islice(values, 512))
+    while nextvalues:
+      # Each item in the list is of the form (s, n, camefrom), we want to
+      # group these by same values of n to avoid recalculation of an & rest
+      for prev_n, grouped_values in itertools.groupby(nextvalues,
+                                                      operator.itemgetter(1)):
+        grouped_values = list(grouped_values) # need to iterate num_to_do times
+        # Determine the number, n, of rand rolls we are checking
+        for n in xrange(prev_n + min_rands, prev_n + min_rands + num_to_do):
+          # Calculate (a^n % m) and (sum_i=0^n a^i*c)%m
+          an, rest = Random._calculate_an_rest(n)
+          # Iterate over grouped values (guaranteed prevn == prev_n)
+          for s, prevn, camefrom in grouped_values:
+            # Check whether this value works
+            map2 = int((an*s+rest)%m)
+            if map2 < interval[1]:
+              yield s, n, (camefrom,n)
+      # Get the next set of values to work on
+      nextvalues = list(itertools.islice(values, 512))
+
+  @staticmethod
   def nth_call_matches(r, p, n, value):
     m = Random.m
     interval, an, rest = Random._calculate_interval_an_rest(r, p, n)
@@ -216,16 +246,6 @@ class Random:
       nextiter = Random.niter_matches(rolls[lvl+1][0], rolls[lvl+1][1],
                                       nextiter, 1, 1)
     return nextiter
-
-  @staticmethod
-  def niter_constrained_less(r, p, values, n):
-    m = Random.m
-    interval, an, rest = Random._calculate_interval_an_rest(r-1, p, n)
-
-    for s, camefrom in values:
-      map2 = int((an*s+rest)%m)
-      if map2 < interval[1]:
-        yield s, (camefrom,n+.1)
 
   def set_seed(self, seed):
     assert seed < self.m and seed > 0 and seed == int(seed)
