@@ -203,6 +203,21 @@ class Random:
       print "Calls to handle_level[{}] = {}".format(x, calls[x])
 
   @staticmethod
+  def compute_possibilities_from_hourly_battles(num_players, rolls):
+    slop = 15
+    assert(len(rolls)%2==0)
+    primary = Random.calculate_interval(rolls[0][0],rolls[0][1])
+    primary = [64992717279990, 64992717279999]
+    nextiter = Random.initial_subinterval(rolls[1][0],rolls[1][1],[primary])
+    for lvl in xrange(2,len(rolls),2):
+      bonus = 7 if rolls[lvl-2][0] > rolls[lvl-1][0] else 5
+      nextiter = Random.niter_matches(rolls[lvl  ][0], rolls[lvl  ][1],
+                                      nextiter, 7200*(1+num_players)+bonus-1, slop)
+      nextiter = Random.niter_matches(rolls[lvl+1][0], rolls[lvl+1][1],
+                                      nextiter, 1, 1)
+    return nextiter
+
+  @staticmethod
   def niter_constrained_less(r, p, values, n):
     m = Random.m
     interval, an, rest = Random._calculate_interval_an_rest(r-1, p, n)
@@ -298,7 +313,12 @@ def slower_compute():
 calculate_with_known_quantities()
 fast = True
 if fast:
-  print(list(faster_compute()))
+  #print(list(faster_compute()))
+  rolls = [[ 81,  353], [367,  439],
+           [312,  439], [254,  440],
+           [104,  353], [386,  440],
+           [303,  353], [176,  439]]
+  print(list(Random.compute_possibilities_from_hourly_battles(2, rolls)))
 else:
   slower_compute()
 raise SystemExit("done.")
