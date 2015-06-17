@@ -237,7 +237,6 @@ class Random:
     slop = 15
     assert(len(rolls)%2==0)
     primary = Random.calculate_interval(rolls[0][0],rolls[0][1])
-    primary = [64992717279990, 64992717279999]
     nextiter = Random.initial_subinterval(rolls[1][0],rolls[1][1],[primary])
     for lvl in xrange(2,len(rolls),2):
       bonus = 7 if rolls[lvl-2][0] > rolls[lvl-1][0] else 5
