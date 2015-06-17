@@ -233,15 +233,16 @@ class Random:
   def compute_possibilities_from_hourly_battles(num_players, rolls):
     slop = 15
     assert(len(rolls)%2==0)
-    primary = Random.calculate_interval(rolls[0][0],rolls[0][1])
-    nextiter = Random.initial_subinterval(rolls[1][0],rolls[1][1],[primary])
+    limiters =     [['equal', rolls[0][0], rolls[0][1], 1, 1]]
+    limiters.append(['equal', rolls[1][0], rolls[1][1], 1, 1])
     for lvl in xrange(2,len(rolls),2):
-      bonus = 7 if rolls[lvl-2][0] > rolls[lvl-1][0] else 5
-      nextiter = Random.niter_matches(rolls[lvl  ][0], rolls[lvl  ][1],
-                                      nextiter, 7200*(1+num_players)+bonus-1, slop)
-      nextiter = Random.niter_matches(rolls[lvl+1][0], rolls[lvl+1][1],
-                                      nextiter, 1, 1)
-    return nextiter
+      battle_rolls = 7 if rolls[lvl-2][0] > rolls[lvl-1][0] else 5
+      limiters.append(['equal', rolls[lvl  ][0], rolls[lvl  ][1],
+                                7200*(1+num_players)+battle_rolls-1, slop])
+      limiters.append(['equal', rolls[lvl+1][0], rolls[lvl+1][1], 1, 1])
+    for limiter in limiters:
+      print limiter
+    return Random.compute_possibilities(limiters)
 
   def set_seed(self, seed):
     assert seed < self.m and seed > 0 and seed == int(seed)
