@@ -301,7 +301,7 @@ def faster_compute():
   return octenary_intervals
 
 def slower_compute():
-  Random.compute_possibilities([['equal',   81,  35300, 0,        1],
+  Random.compute_possibilities([['equal',   81,  353, 0,        1],
                                 ['equal',  367,  439, 1,        1],
                                 ['equal',  312,  439, 21606-1,  1],
                                 ['equal',  254,  440, 1,        1],
