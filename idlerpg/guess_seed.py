@@ -207,30 +207,27 @@ class Random:
     for item in iter(qs[len(matches)-1].get, sentinel):
       print item
 
-
   @staticmethod
-  def compute_possibilities(matches):
-    calls = Counter()
-    def handle_level(lvl, base_n, value):
-      calls[lvl] += 1
-      if lvl == len(matches):
-        print "Found match: {}".format(value)
-        return
-      r, p, base_inc, num_to_do = matches[lvl][1:]
-      for j in xrange(base_n+base_inc, base_n+base_inc+num_to_do):
-        if Random.nth_call_matches(r, p, j, value):
-          handle_level(lvl+1, j, value)
+  def compute_possibilities(limiters):
+    assert limiters[0][0]=='equal' and limiters[0][3]==1 and limiters[0][4]==1
+    assert limiters[1][0]=='equal' and limiters[1][3]==1 and limiters[1][4]==1
 
-    assert matches[0][0]=='equal' and matches[0][3]==0 and matches[0][4]==1
-    assert matches[1][0]=='equal' and matches[1][3]==1 and matches[1][4]==1
-
-    primary = Random.calculate_interval(matches[0][1],matches[0][2])
-    secondary = Random.initial_subinterval(matches[1][1],matches[1][2],
+    primary = Random.calculate_interval(limiters[0][1],limiters[0][2])
+    nextiter = Random.initial_subinterval(limiters[1][1],limiters[1][2],
                                            [primary])
-    for value, camefrom in secondary:
-      handle_level(2, 1, value)
-    for x in calls:
-      print "Calls to handle_level[{}] = {}".format(x, calls[x])
+    for lvl in xrange(2,len(limiters)):
+      if limiters[lvl][0] == 'equal':
+        nextiter = Random.niter_matches(limiters[lvl][1], limiters[lvl][2],
+                                        nextiter,
+                                        limiters[lvl][3], limiters[lvl][4])
+      elif limiters[lvl][0] == 'less':
+        nextiter = Random.niter_constrained_less(
+                                        limiters[lvl][1], limiters[lvl][2],
+                                        nextiter,
+                                        limiters[lvl][3], limiters[lvl][4])
+      else:
+        raise SystemExit("Invalid limiter type: "+limiters[lvl][0])
+    return nextiter
 
   @staticmethod
   def compute_possibilities_from_hourly_battles(num_players, rolls):
