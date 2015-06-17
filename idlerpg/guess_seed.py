@@ -100,6 +100,7 @@ class Random:
       # group these by same values of n to avoid recalculation of an & rest
       for prev_n, grouped_values in itertools.groupby(nextvalues,
                                                       operator.itemgetter(1)):
+        grouped_values = list(grouped_values)
         # Determine the number, n, of rand rolls we are checking
         for n in xrange(prev_n + min_rands, prev_n + min_rands + num_to_do):
           # Calculate (a^n % m) and (sum_i=0^n a^i*c)%m
