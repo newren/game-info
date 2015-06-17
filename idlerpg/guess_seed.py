@@ -249,22 +249,23 @@ def count_hops(initial_seed, final_seed):
 #<idlerpg> newren [303/353] has challenged other [176/439] in combat and won! 0 days, 10:22:48 is removed from newren's clock.
 #<idlerpg> newren reaches next level in 3 days, 11:59:02.
 
-randcounts=[224491502306380, 126166889533354, 265930535560594, 277450753605568]
-for pair in zip(randcounts, randcounts[1:]):
-  print(pair)
-  print "Hops: {}, 3-after: {}".format(count_hops(pair[0], pair[1]),
-                                       calc_rand48(pair[0], 3))
-v = Random()
-v.set_seed(224491502306380)
-assert  81 == int(v.rand(353, 3)); print(v.seed)
-assert 367 == int(v.rand(439, 1)); print(v.seed)
-assert 312 == int(v.rand(439, 21606-1)); print(v.seed)
-assert 254 == int(v.rand(440, 1)); print(v.seed)
-assert 104 == int(v.rand(353, 21608-1)); print(v.seed)
-assert 386 == int(v.rand(440, 1)); print(v.seed)
-assert 303 == int(v.rand(353, 21606-1)); print(v.seed)
-assert 176 == int(v.rand(439, 1)); print(v.seed)
-print "Basic checks passed"
+def calculate_with_known_quantities():
+  randcounts=[224491502306380,126166889533354,265930535560594,277450753605568]
+  for pair in zip(randcounts, randcounts[1:]):
+    print(pair)
+    print "Hops: {}, 3-after: {}".format(count_hops(pair[0], pair[1]),
+                                         calc_rand48(pair[0], 3))
+  v = Random()
+  v.set_seed(224491502306380)
+  assert  81 == int(v.rand(353, 3)); print(v.seed)
+  assert 367 == int(v.rand(439, 1)); print(v.seed)
+  assert 312 == int(v.rand(439, 21606-1)); print(v.seed)
+  assert 254 == int(v.rand(440, 1)); print(v.seed)
+  assert 104 == int(v.rand(353, 21608-1)); print(v.seed)
+  assert 386 == int(v.rand(440, 1)); print(v.seed)
+  assert 303 == int(v.rand(353, 21606-1)); print(v.seed)
+  assert 176 == int(v.rand(439, 1)); print(v.seed)
+  print "Basic checks passed"
 
 def faster_compute():
   primary_interval = Random.calculate_interval(81,353)
@@ -278,7 +279,7 @@ def faster_compute():
   senary_intervals = Random.niter_matches(386, 440,
                                           quinary_intervals, 1, 2)
   septenary_intervals = Random.niter_matches(303, 353,
-                                             senary_intervals, 21606-1, 1)
+                                             senary_intervals, 21606-1, 2)
   octenary_intervals = Random.niter_matches(176, 439,
                                             septenary_intervals, 1, 2)
   return octenary_intervals
@@ -287,12 +288,13 @@ def slower_compute():
   Random.compute_possibilities([['equal',   81,  35300, 0,        1],
                                 ['equal',  367,  439, 1,        1],
                                 ['equal',  312,  439, 21606-1,  1],
-                                ['equal',  254,  440, 1,        1]]) #,
-                                #['equal',  104,  353, 21608-2,  1],
-                                #['equal',  386,  440, 1,        1],
-                                #['equal',  303,  353, 21606-2,  1],
-                                #['equal',  176,  439, 1,        1]])
+                                ['equal',  254,  440, 1,        1],
+                                ['equal',  104,  353, 21608-2,  1],
+                                ['equal',  386,  440, 1,        1],
+                                ['equal',  303,  353, 21606-2,  1],
+                                ['equal',  176,  439, 1,        1]])
 
+calculate_with_known_quantities()
 fast = True
 if fast:
   print(list(faster_compute()))
