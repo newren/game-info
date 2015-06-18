@@ -45,7 +45,7 @@ class Random:
           assert map2-a < new_interval[0]
           assert map2 > new_interval[0] and map2 < new_interval[1]
         while map2 < new_interval[1]:
-          yield s, 1, s
+          yield s, 1, ((s, 0), 1)
           s += 1
           map2 += a
 
@@ -125,53 +125,9 @@ class Random:
       nextvalues = list(itertools.islice(values, 512))
 
   @staticmethod
-  def compute_possibles(matches):
-    sentinel = 'DONE'
-    def execute(func, input_queue, output_queues):
-      for result in func(iter(input_queue.get, sentinel)):
-        for output in output_queues:
-          output.put(result)
-      for output in output_queues:
-        output.put(sentinel)
-
-    assert matches[0][0]=='equal' and matches[0][3]==0 and matches[0][4]==1
-    assert matches[1][0]=='equal' and matches[1][3]==1 and matches[1][4]==1
-
-    qs = []
-    for i in xrange(len(matches)):
-      qs.append(multiprocessing.Queue())
-      pass
-    primary = Random.calculate_interval(matches[0][1],matches[0][2])
-    qs[0].put(primary)
-    qs[0].put(sentinel)
-    ps = []
-    proc = multiprocessing.Process(target=functools.partial(
-                            execute,
-                            functools.partial(Random.initial_subinterval,
-                                              matches[1][1], matches[1][2]),
-                            qs[0], [qs[1]]))
-    proc.start()
-    ps.append(proc)
-    for i in xrange(2,len(matches)):
-      style, r, p, n, extra_n = matches[i]
-      proc = multiprocessing.Process(target=functools.partial(
-                              execute,
-                              functools.partial(Random.foobar,
-                                                r, p, n, extra_n),
-                              qs[i-1], [qs[i]]))
-      proc.start()
-      ps.append(proc)
-    for item in iter(qs[len(matches)-1].get, sentinel):
-      print item
-
-  @staticmethod
-  def compute_possibilities(limiters):
-    assert limiters[0][0]=='equal' and limiters[0][3]==1 and limiters[0][4]==1
-    assert limiters[1][0]=='equal' and limiters[1][3]==1 and limiters[1][4]==1
-
-    primary = Random.calculate_interval(limiters[0][1],limiters[0][2])
+  def compute_possibilities_helper(limiters, interval):
     nextiter = Random.initial_subinterval(limiters[1][1],limiters[1][2],
-                                           [primary])
+                                           [interval])
     for lvl in xrange(2,len(limiters)):
       if limiters[lvl][0] == 'equal':
         nextiter = Random.niter_matches(limiters[lvl][1], limiters[lvl][2],
@@ -185,6 +141,41 @@ class Random:
       else:
         raise SystemExit("Invalid limiter type: "+limiters[lvl][0])
     return nextiter
+
+  @staticmethod
+  def compute_possibilities(limiters):
+    def execute_on_subinterval(limiters, subinterval, result_queue):
+      for result in Random.compute_possibilities_helper(limiters, subinterval):
+        result_queue.put(result)
+
+    assert limiters[0][0]=='equal' and limiters[0][3]==1 and limiters[0][4]==1
+    assert limiters[1][0]=='equal' and limiters[1][3]==1 and limiters[1][4]==1
+    primary = Random.calculate_interval(limiters[0][1],limiters[0][2])
+
+    np = multiprocessing.cpu_count()/2
+    per_proc_check = int(math.ceil((primary[1]-primary[0]+1.0)/np))
+
+    result_queue = multiprocessing.Queue()
+    procs = []
+    for i in xrange(np):
+      interval = [                primary[0]+(i+0)*per_proc_check,
+                  min(primary[1], primary[0]+(i+1)*per_proc_check-1)]
+      proc = multiprocessing.Process(target=execute_on_subinterval,
+                                     args=(limiters, interval, result_queue))
+      proc.start()
+      procs.append(proc)
+    for proc in procs:
+      proc.join()
+    result_queue.put('DONE')
+    return iter(result_queue.get, 'DONE')
+
+  @staticmethod
+  def serial_compute_possibilities(limiters):
+    assert limiters[0][0]=='equal' and limiters[0][3]==1 and limiters[0][4]==1
+    assert limiters[1][0]=='equal' and limiters[1][3]==1 and limiters[1][4]==1
+
+    primary = Random.calculate_interval(limiters[0][1],limiters[0][2])
+    return Random.compute_possibilities_helper(limiters, primary)
 
   @staticmethod
   def compute_possibilities_from_hourly_battles(num_players, rolls):
@@ -226,19 +217,6 @@ def count_hops(initial_seed, final_seed):
     count += 1
   return count
 
-#<idlerpg> Rand: 224491502306380
-#<idlerpg> newren [81/353] has challenged other [367/439] in combat and lost! 0 days, 06:19:44 is added to newren's clock.
-#<idlerpg> newren reaches next level in 4 days, 00:44:39.
-#<idlerpg> Rand: 126166889533354
-#<idlerpg> other [312/439] has challenged idlerpg [254/440] in combat and won! 0 days, 07:25:49 is removed from other's clock.
-#<idlerpg> other reaches next level in 1 day, 05:43:16.
-#<idlerpg> Rand: 265930535560594
-#<idlerpg> newren [104/353] has challenged idlerpg [386/440] in combat and lost! 0 days, 08:40:10 is added to newren's clock.
-#<idlerpg> newren reaches next level in 3 days, 23:21:56.
-#<idlerpg> Rand: 277450753605568
-#<idlerpg> newren [303/353] has challenged other [176/439] in combat and won! 0 days, 10:22:48 is removed from newren's clock.
-#<idlerpg> newren reaches next level in 3 days, 11:59:02.
-
 def calculate_with_known_quantities():
   randcounts=[224491502306380,126166889533354,265930535560594,277450753605568]
   for pair in zip(randcounts, randcounts[1:]):
@@ -258,34 +236,85 @@ def calculate_with_known_quantities():
   print "Basic checks passed"
 
 def handle_local_case_a():
+  #<idlerpg> Rand: 224491502306380
+  #<idlerpg> newren [81/353] has challenged other [367/439] in combat and lost! 0 days, 06:19:44 is added to newren's clock.
+  #<idlerpg> newren reaches next level in 4 days, 00:44:39.
+  #<idlerpg> Rand: 126166889533354
+  #<idlerpg> other [312/439] has challenged idlerpg [254/440] in combat and won! 0 days, 07:25:49 is removed from other's clock.
+  #<idlerpg> other reaches next level in 1 day, 05:43:16.
+  #<idlerpg> Rand: 265930535560594
+  #<idlerpg> newren [104/353] has challenged idlerpg [386/440] in combat and lost! 0 days, 08:40:10 is added to newren's clock.
+  #<idlerpg> newren reaches next level in 3 days, 23:21:56.
+  #<idlerpg> Rand: 277450753605568
+  #<idlerpg> newren [303/353] has challenged other [176/439] in combat and won! 0 days, 10:22:48 is removed from newren's clock.
+  #<idlerpg> newren reaches next level in 3 days, 11:59:02.
   calculate_with_known_quantities()
   rolls = [[ 81,  353], [367,  439],
            [312,  439], [254,  440],
            [104,  353], [386,  440],
            [303,  353], [176,  439]]
   print(list(Random.compute_possibilities_from_hourly_battles(2, rolls)))
+  # answer: [(64992717279993, 64821, ((((((64992717279993, 21606), 21607), 43214), 43215), 64820), 64821))]
   raise SystemExit("done.")
 
-#2015-04-18 21:56:39 <idlerpg>   yzhou [352/879] has challenged nebkor [567/581] in combat and lost! 0 days, 15:18:52 is added to yzhou's clock.
-#2015-04-18 21:56:42 <idlerpg>   yzhou reaches next level in 9 days, 18:05:38.
-#2015-04-18 22:56:37 <idlerpg>   j [611/987] has challenged yzhou [770/879] in combat and lost! 0 days, 08:08:03 is added to j's clock.
-#2015-04-18 22:56:37 <idlerpg>   j reaches next level in 3 days, 17:28:34.
-#2015-04-18 23:56:41 <idlerpg>   elijah [34/791] has challenged pef [224/889] in combat and lost! 0 days, 09:07:58 is added to elijah's clock.
-#2015-04-18 23:56:41 <idlerpg>   elijah reaches next level in 3 days, 20:09:35.
-#2015-04-19 00:56:44 <idlerpg>   Sessile [186/1327] has challenged kverdieck [556/693] in combat and lost! 0 days, 09:57:27 is added to Sessile's clock.
-#2015-04-19 00:56:44 <idlerpg>   Sessile reaches next level in 4 days, 13:31:57.
-#2015-04-19 01:23:13 <idlerpg>   j, kelsey, elijah, and yzhou have been chosen by the gods to rescue the beautiful princess Juliet from the grasp of the beast Grabthul. Participants must first reach [167,458], then [325,270].
-
 def handle_original_case_b():
+  #2015-04-18 21:56:39 <idlerpg>   yzhou [352/879] has challenged nebkor [567/581] in combat and lost! 0 days, 15:18:52 is added to yzhou's clock.
+  #2015-04-18 21:56:42 <idlerpg>   yzhou reaches next level in 9 days, 18:05:38.
+  #2015-04-18 22:56:37 <idlerpg>   j [611/987] has challenged yzhou [770/879] in combat and lost! 0 days, 08:08:03 is added to j's clock.
+  #2015-04-18 22:56:37 <idlerpg>   j reaches next level in 3 days, 17:28:34.
+  #2015-04-18 23:56:41 <idlerpg>   elijah [34/791] has challenged pef [224/889] in combat and lost! 0 days, 09:07:58 is added to elijah's clock.
+  #2015-04-18 23:56:41 <idlerpg>   elijah reaches next level in 3 days, 20:09:35.
+  #2015-04-19 00:56:44 <idlerpg>   Sessile [186/1327] has challenged kverdieck [556/693] in combat and lost! 0 days, 09:57:27 is added to Sessile's clock.
+  #2015-04-19 00:56:44 <idlerpg>   Sessile reaches next level in 4 days, 13:31:57.
+  #2015-04-19 01:23:13 <idlerpg>   j, kelsey, elijah, and yzhou have been chosen by the gods to rescue the beautiful princess Juliet from the grasp of the beast Grabthul. Participants must first reach [167,458], then [325,270].
   rolls = [[352,  879], [567,  581],
            [611,  987], [770,  879],
            [ 34,  791], [224,  889],
            [186, 1327], [556,  693]]
-  print(list(Random.compute_possibilities_from_hourly_battles(14, rolls)))
+  print(list(Random.compute_possibilities_from_hourly_battles(13, rolls)))
+  # answer: [(112858162602330, 302419, ((((((112858162602330, 100806), 100807), 201612), 201613), 302418), 302419))]
+  raise SystemExit("I quit.")
+
+def handle_original_case_a():
+  #2015-04-08 21:14:21 <idlerpg>   kverdieck, Sessile, elijah, and nebkor have been chosen by the gods to locate the centuries-lost tomes of the grim prophet Haplashak Mhadhu. Quest to end in 0 days, 14:31:59.
+  #...
+  #2015-04-09 05:43:38 <idlerpg>   Sessile [418/1327] has challenged dlaw [227/877] in combat and won! 1 day, 00:54:47 is removed from Sessile's clock.
+  #2015-04-09 05:43:38 <idlerpg>   Sessile reaches next level in 4 days, 10:12:32.
+  #2015-04-09 05:43:38 <idlerpg>   Sessile has dealt dlaw a Critical Strike! 1 day, 10:24:22 is added to dlaw's clock.
+  #2015-04-09 05:43:38 <idlerpg>   dlaw reaches next level in 13 days, 09:07:30.
+  #2015-04-09 05:52:15 <idlerpg>   The local wizard imbued yzhou's pants with a Spirit of Fortitude! yzhou's set of leggings gains 10% effectiveness.
+  #2015-04-09 06:43:42 <idlerpg>   dlaw [771/877] has challenged trogdor [217/365] in combat and won! 1 day, 08:00:44 is removed from dlaw's clock.
+  #2015-04-09 06:43:42 <idlerpg>   dlaw reaches next level in 12 days, 00:06:43.
+  #2015-04-09 07:23:56 <idlerpg>   elijah met up with a mob hitman for not paying their bills. This terrible calamity has slowed them 0 days, 11:05:06 from level 72.
+  #2015-04-09 07:23:56 <idlerpg>   elijah reaches next level in 9 days, 16:47:19.
+  #2015-04-09 07:43:51 <idlerpg>   pef [701/889] has challenged amling [136/366] in combat and won! 0 days, 10:07:43 is removed from pef's clock.
+  #2015-04-09 07:43:54 <idlerpg>   pef reaches next level in 3 days, 09:56:59.
+  #
+  # So:
+  #  Inital battle:
+  #    418/1327
+  #    227/877
+  #    CS : 0/50 (1 out of 50, means given 50 roll a 0)
+  #    Gain : 12%  (7/20)
+  # 13 players, 1 godsend, 7 battle_rolls but 3 counted: ((1+13)*7200)+(3)+(7-3)
+  # 13 players, 1 calamity, 7 battle_rolls but 1 counted: ((1+13)*7200)+(3+31)+(7-1)
+  limiters = [
+              ['equal', 418, 1327, 1, 1],
+              ['equal', 227,  877, 1, 1],
+              ['less',    1,   50, 1, 1],
+              ['equal',   7,   20, 1, 1],
+              ['equal', 771,  877, ((1+13)*7200)+(3)+(7-3)-10, 40],
+              ['equal', 217,  365, 1, 1],
+              ['equal', 701,  889, ((1+13)*7200)+(3+31)+(7-1)-10, 40],
+              ['equal', 136,  366, 1, 1]
+             ]
+  print(list(Random.compute_possibilities(limiters)))
+  # answer: failed to find; don't know why
   raise SystemExit("I quit.")
 
 #handle_local_case_a()
 handle_original_case_b()
+#handle_original_case_a()
 
 if False:
   seeds = []
