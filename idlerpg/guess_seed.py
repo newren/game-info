@@ -50,26 +50,6 @@ class Random:
           map2 += a
 
   @staticmethod
-  def _calculate_interval_an_rest(r, p, n):
-    interval = Random.calculate_interval(r,p)
-    if n in Random.apower_cache:
-      rest, an = Random.apower_cache[n]
-    else:
-      a,c,m = Random.a,Random.c,Random.m
-      try:
-        calced = max(x for x in Random.apower_cache.keys() if x < n)
-        rest, an = Random.apower_cache[calced]
-      except ValueError:
-        calced = 0
-        rest = c
-        an = a
-      for i in xrange(n-calced):
-        rest = int((a*rest+c)%m)
-        an = int((a*an)%m)
-      Random.apower_cache[n] = (rest, an)
-    return interval, an, rest
-
-  @staticmethod
   def _calculate_an_rest(n):
     if n in Random.apower_cache:
       rest, an = Random.apower_cache[n]
@@ -143,29 +123,6 @@ class Random:
               yield s, n, (camefrom,n)
       # Get the next set of values to work on
       nextvalues = list(itertools.islice(values, 512))
-
-  @staticmethod
-  def nth_call_matches(r, p, n, value):
-    m = Random.m
-    interval, an, rest = Random._calculate_interval_an_rest(r, p, n)
-
-    s = value
-    map2 = int((an*s+rest)%m)
-    if map2 > interval[0] and map2 < interval[1]:
-      return True
-    return False
-
-  @staticmethod
-  def foobar(r, p, n, extran, values):
-    m = Random.m
-
-    for s, prev_n, camefrom in values:
-      for j in xrange(extran):
-        cur_n = prev_n+n+j
-        interval, an, rest = Random._calculate_interval_an_rest(r, p, cur_n)
-        map2 = int((an*s+rest)%m)
-        if map2 > interval[0] and map2 < interval[1]:
-          yield s, cur_n, (camefrom,cur_n)
 
   @staticmethod
   def compute_possibles(matches):
@@ -300,45 +257,14 @@ def calculate_with_known_quantities():
   assert 176 == int(v.rand(439, 1)); print(v.seed)
   print "Basic checks passed"
 
-def faster_compute():
-  primary_interval = Random.calculate_interval(81,353)
-  secondary_intervals = Random.initial_subinterval(367, 439, [primary_interval])
-  tertiary_intervals = Random.niter_matches(312, 439,
-                                            secondary_intervals, 21606-1, 2)
-  quaternary_intervals = Random.niter_matches(254, 440,
-                                              tertiary_intervals, 1, 2)
-  quinary_intervals = Random.niter_matches(104, 353,
-                                           quaternary_intervals, 21608-1, 2)
-  senary_intervals = Random.niter_matches(386, 440,
-                                          quinary_intervals, 1, 2)
-  septenary_intervals = Random.niter_matches(303, 353,
-                                             senary_intervals, 21606-1, 2)
-  octenary_intervals = Random.niter_matches(176, 439,
-                                            septenary_intervals, 1, 2)
-  return octenary_intervals
-
-def slower_compute():
-  Random.compute_possibilities([['equal',   81,  353, 0,        1],
-                                ['equal',  367,  439, 1,        1],
-                                ['equal',  312,  439, 21606-1,  1],
-                                ['equal',  254,  440, 1,        1],
-                                ['equal',  104,  353, 21608-2,  1],
-                                ['equal',  386,  440, 1,        1],
-                                ['equal',  303,  353, 21606-2,  1],
-                                ['equal',  176,  439, 1,        1]])
-
-calculate_with_known_quantities()
-fast = True
-if fast:
-  #print(list(faster_compute()))
+def handle_local_case_a():
+  calculate_with_known_quantities()
   rolls = [[ 81,  353], [367,  439],
            [312,  439], [254,  440],
            [104,  353], [386,  440],
            [303,  353], [176,  439]]
   print(list(Random.compute_possibilities_from_hourly_battles(2, rolls)))
-else:
-  slower_compute()
-raise SystemExit("done.")
+  raise SystemExit("done.")
 
 #2015-04-18 21:56:39 <idlerpg>   yzhou [352/879] has challenged nebkor [567/581] in combat and lost! 0 days, 15:18:52 is added to yzhou's clock.
 #2015-04-18 21:56:42 <idlerpg>   yzhou reaches next level in 9 days, 18:05:38.
@@ -350,27 +276,16 @@ raise SystemExit("done.")
 #2015-04-19 00:56:44 <idlerpg>   Sessile reaches next level in 4 days, 13:31:57.
 #2015-04-19 01:23:13 <idlerpg>   j, kelsey, elijah, and yzhou have been chosen by the gods to rescue the beautiful princess Juliet from the grasp of the beast Grabthul. Participants must first reach [167,458], then [325,270].
 
-Random.compute_possibles([['equal',  352,  879, 0,        1],
-                              ['equal',  567,  581, 1,        1],
-                              ['equal',  611,  987, 100805-1, 1],
-                              ['equal',  770,  879, 1,        1],
-                              ['equal',   34,  791, 100805-1, 1],
-                              ['equal',  224,  889, 1,        1],
-                              ['equal',  186, 1327, 100805-1, 1],
-                              ['equal',  556,  693, 1,        1]])
-raise SystemExit("done.")
+def handle_original_case_b():
+  rolls = [[352,  879], [567,  581],
+           [611,  987], [770,  879],
+           [ 34,  791], [224,  889],
+           [186, 1327], [556,  693]]
+  print(list(Random.compute_possibilities_from_hourly_battles(14, rolls)))
+  raise SystemExit("I quit.")
 
-Random.compute_possibilities([['equal',  352,  879, 0,        1],
-                              ['equal',  567,  581, 1,        1],
-                              ['equal',  611,  987, 100805-1, 1],
-                              ['equal',  770,  879, 1,        1],
-                              ['equal',   34,  791, 100805-1, 1],
-                              ['equal',  224,  889, 1,        1],
-                              ['equal',  186, 1327, 100805-1, 1],
-                              ['equal',  556,  693, 1,        1]])
-print "Hello world"
-compute_alternate_possibilities()
-raise SystemExit("I quit")
+#handle_local_case_a()
+handle_original_case_b()
 
 if False:
   seeds = []
@@ -414,27 +329,6 @@ def check_values(values, hrc=0):
     else:
       print "Value {} (when hrc={}) works".format(x, hrc)
 
-def compute_possibilities(hrc = 0):
-  # hrc == hidden rand() calls, from collisions or whatever
-  primary_interval = Random.calculate_interval(418,1327)
-  secondary_intervals = Random.initial_subinterval(227, 877, [primary_interval])
-  tertiary_intervals = Random.niter_constrained_less(1, 50,
-                                                     secondary_intervals, 2)
-  quaternary_intervals = Random.niter_matches(7, 20, tertiary_intervals, 3)
-
-  quinary_intervals = Random.niter_constrained_less(13, 115200,
-                                                    quaternary_intervals,
-                                                    14371+hrc)
-  senary_intervals = Random.niter_constrained_less(1, 10,
-                                                   quinary_intervals,
-                                                   14371+2+hrc)
-  septenary_intervals = Random.niter_matches(4, 6, senary_intervals,
-                                             14371+3+hrc)
-
-  for value, camefrom in septenary_intervals:
-    print "Working value for hrc=={} found: {}; camefrom: {}".format(hrc, value, camefrom)
-    check_values([value], hrc)
-
 # No solution when hrc in set(1,4,5)
 check_values([88675141333930, 88730764249721], 0)
 check_values([88732726299080], 2)
@@ -444,22 +338,6 @@ check_values([88730108276003], 8)
 check_values([88723502212290, 88754264960240], 9)
 check_values([88682430352412], 12)
 check_values([88685261265828], 13)
-
-
-#Working value for hrc==8 found: 88730108276003; camefrom: (((((88730108276003, 2.1), 3), 14379.1), 14381.1), 14382)
-#Value 88730108276003 (when hrc=8) is no good
-#Working value for hrc==9 found: 88723502212290; camefrom: (((((88723502212290, 2.1), 3), 14380.1), 14382.1), 14383)
-#Value 88723502212290 (when hrc=9) is no good
-#Working value for hrc==9 found: 88754264960240; camefrom: (((((88754264960240, 2.1), 3), 14380.1), 14382.1), 14383)
-#Value 88754264960240 (when hrc=9) is no good
-#Working value for hrc==12 found: 88682430352412; camefrom: (((((88682430352412, 2.1), 3), 14383.1), 14385.1), 14386)
-#Value 88682430352412 (when hrc=12) is no good
-#Working value for hrc==13 found: 88685261265828; camefrom: (((((88685261265828, 2.1), 3), 14384.1), 14386.1), 14387)
-#Value 88685261265828 (when hrc=13) is no good
-for hrc in xrange(0,15):
-  compute_possibilities(hrc)
-raise SystemExit("I quit.")
-
 
 #2015-04-09 05:43:38 <idlerpg>   Sessile [418/1327] has challenged dlaw [227/877] in combat and won! 1 day, 00:54:47 is removed from Sessile's clock.
 #2015-04-09 05:43:38 <idlerpg>   Sessile reaches next level in 4 days, 10:12:32.
@@ -524,41 +402,3 @@ raise SystemExit("I quit.")
 #    battle roll, we'd just leave off the (14371+4) part and get:
 #      (2+6*13) + (1200-172)*(6+6*13) + 3 = 86435
 #    Again, this all assumes no collisions.
-
-
-intervals = []
-r = 418
-p = 1327
-interval = [(r+0.0)*m/p*(1-5*eps), (r+1.0)*m/p*(1+5*eps)]
-r = 227
-p = 877
-new_interval = [(r+0.0)*m/p*(1-5*eps), (r+1.0)*m/p*(1+5*eps)]
-
-s=math.ceil(interval[0])
-possibilities = []
-while s <= math.floor(interval[1]):
-  map2 = (a*s+c)%m
-  if map2 < new_interval[0]:
-    s += math.ceil((new_interval[0]  -map2)/a*(1-5*eps))
-  if map2 > new_interval[1]:
-    s += math.ceil((new_interval[0]+m-map2)/a*(1-5*eps))
-  if (a*s+c)%m < new_interval[0]:  # 1-5eps safety factor might be too much
-    s += 1
-  map2 = (a*s+c)%m
-  assert map2 > new_interval[0] and map2 < new_interval[1]
-  while map2 < new_interval[1]:
-    possibilities.append(s)
-    s += 1
-    map2 += a
-
-
-print len(possibilities)
-print min(possibilities)
-print max(possibilities)
-print sum(possibilities)/len(possibilities)
-print sum(interval)/2
-print interval
-
-
-x2 = (a*x1+c)%m
-x1 = (x2*km-c)/a
