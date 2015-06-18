@@ -44,7 +44,7 @@ class Random:
           map2 = int((a*s+c)%m)
           assert map2-a < new_interval[0]
           assert map2 > new_interval[0] and map2 < new_interval[1]
-        while map2 < new_interval[1]:
+        while map2 < new_interval[1] and s<=interval[1]:
           yield s, 1, ((s, 0), 1)
           s += 1
           map2 += a
