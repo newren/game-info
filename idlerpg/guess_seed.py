@@ -179,14 +179,14 @@ class Random:
 
   @staticmethod
   def compute_possibilities_from_hourly_battles(num_players, rolls):
-    slop = 15
+    hrc = 1 # hidden rand calls, such as from map collisions
     assert(len(rolls)%2==0)
     limiters =     [['equal', rolls[0][0], rolls[0][1], 1, 1]]
     limiters.append(['equal', rolls[1][0], rolls[1][1], 1, 1])
     for lvl in xrange(2,len(rolls),2):
       battle_rolls = 7 if rolls[lvl-2][0] > rolls[lvl-1][0] else 5
       limiters.append(['equal', rolls[lvl  ][0], rolls[lvl  ][1],
-                                7200*(1+num_players)+battle_rolls-1, slop])
+                                7200*(1+num_players)+battle_rolls-1, 1+hrc])
       limiters.append(['equal', rolls[lvl+1][0], rolls[lvl+1][1], 1, 1])
     for limiter in limiters:
       print limiter
@@ -254,7 +254,7 @@ def handle_local_case_a():
            [104,  353], [386,  440],
            [303,  353], [176,  439]]
   print(list(Random.compute_possibilities_from_hourly_battles(2, rolls)))
-  # answer: [(64992717279993, 64821, ((((((64992717279993, 21606), 21607), 43214), 43215), 64820), 64821))]
+  # answer: [(64992717279993, 64821, ((((((((64992717279993, 0), 1), 21606), 21607), 43214), 43215), 64820), 64821))]
   raise SystemExit("done.")
 
 def handle_original_case_b():
@@ -272,7 +272,7 @@ def handle_original_case_b():
            [ 34,  791], [224,  889],
            [186, 1327], [556,  693]]
   print(list(Random.compute_possibilities_from_hourly_battles(13, rolls)))
-  # answer: [(112858162602330, 302419, ((((((112858162602330, 100806), 100807), 201612), 201613), 302418), 302419))]
+  # answer: [(112858162602330, 302419, ((((((((112858162602330, 0), 1), 100806), 100807), 201612), 201613), 302418), 302419))]
   raise SystemExit("I quit.")
 
 def handle_original_case_a():
