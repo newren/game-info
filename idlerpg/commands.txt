@@ -241,15 +241,111 @@ random battle -- try to predict later
 4
 => pef=10 (excluding trogdor), trogdor=8, no idlerpg
 
-
-The +7 implies there was at least 1 collision that did not result in a
-battle (or other unseen rand() calls) as the collision fight should
-only use 5-6 rand() calls -- 1 to determine whether the collision
-should result in a fight, and 4-5 for the actual fight.
+The +7 implies there were 4 collisions that did not result in a battle
+(or other unseen rand() calls) as the collision fight should only use
+3 rand() calls -- 1 to determine whether the collision should result
+in a fight, and 2 for the actual fight (since the battle was lost; it'd
+take 4-5 if the battle was won).
 
 #2015-04-19 06:20:19 <idlerpg>   Sessile was caught in a terrible snowstorm. This terrible calamity has slowed them 0 days, 06:14:54 from level 81.
 #2015-04-19 06:20:19 <idlerpg>   Sessile reaches next level in 4 days, 14:23:16.
-This will add 3+(#calamity-types) rand() calls
+
+Trying to guesstimate when this would occur, we get:
+>>> (23*60+16)/3.0
+465.3333333333333
+>>> 465*(online-1)*6
+33480
+
+This is the number of rand() calls from the intermediate cycles that didn't
+have anything.  Getting from the last attacker roll at
+
+>>> count = 395200+100808*2+100806*2-4*3600*(2+2)+7
+
+to the very first calamity roll that folls is 5 rolls, so adding in the rolls
+from the intermediate cycles, I'd expect the calamity roll at count+5+33480:
+
+>>> int(doit(count+5+33480, 8*86400/3))
+41384
+
+That's definitely not less than the number of people online (13), so our count
+is wrong.  What if we add up to 10 collisions:
+
+>>> any(int(doit(count+5+33480+x, 8*86400/3)) < online for x in xrange(10))
+False
+
+What if the questers reached the first destination point?  Then there would be
+(#online-1)*6 less rand() calls:
+>>> for x in xrange(10):
+>>>   if int(doit(count+5+33480-(online-1)*6+x, 8*86400/3)) < online: print x
+5
+
+So, if the questers reached the first destination point and there were 5
+collisions then this could work.  Seems a tad unlikely; did I do my math wrong
+somewhere?  Note that we could also find possible rand() call counts from:
+>>> for x in xrange(count, count+100808):
+...   if doit(x, 8*86400/3) < online: print x-count
+18018
+25811
+33418
+48708
+53805
+72937
+74877
+99044
+
+Anyway, let's take the count+5+33480-(online-1)*6+5 number and run with it, so
+there is a calamity.  Let's find out who it hits:
+>>> base = count+5+33480-(online-1)*6+5
+>>> int(doit(base+1, online))
+6
+
+Sessile!  Wahoo.
+>>> int(doit(base+2, 10))
+8
+
+not 0, so not an item calamity.  That's good.  How bad is the calamity?
+>>> int(doit(base+3, 8))
+1
+
+Not very bad; only a 6% penalty.  Does that match what was reported?
+>>> tot = 4*86400+14*3600+23*60+16
+>>> added = 6*3600+14*60+54
+>>> added/(tot-added+0.0)
+0.059999679916351474
+
+Yep, sure does.  What kind of calamity was it?
+>>> count = 1
+>>> with open('../bot.v3.1.2/events.txt') as f:
+>>>   for line in f:
+>>>     if line.startswith('C'):
+>>>       if doit(base+3+count, count) < 1:
+>>>         print "SELECTED: "+line.rstrip()
+>>>       count+=1
+SELECTED: C was bitten by drdink
+SELECTED: C fell into a hole
+SELECTED: C ate a poisonous fruit
+SELECTED: C was caught in a terrible snowstorm
+
+and indeed, Sessile was caught in a terrible snowstorm.  So, my "base" value
+is obviously correct.  I'm just slightly unsure of the math and whether people
+really did hit the first quest point and there were 5 collisions.
+
+Note that this added 3+(#calamity-types) rand() calls.
+
+Also I guess I could use the following, but the two adjustments couldn't really
+be known beforehand:
+>>> count = 395200+100808*2+100806*2-4*3600*(2+2)+7+2
+>>> adjustments = -6*(online-1) + 5
+>>> count += adjustments
+>>> online, online_good, online_evil = 13, 5, 2
+>>> for x in xrange(1200):
+>>>   if doit(count+6*(online-1)*x+1, 20*86400/3) < online: print "HOG",x
+>>>   if doit(count+6*(online-1)*x+2, 24*86400/3) < online: print "Team Battle",x
+>>>   if doit(count+6*(online-1)*x+3,  8*86400/3) < online: print "Calamity",x
+>>>   if doit(count+6*(online-1)*x+4,  4*86400/3) < online: print "Godsend",x
+>>>   if doit(count+6*(online-1)*x+5,  8*86400/3) < online_evil: print "Evilness",x
+>>>   if doit(count+6*(online-1)*x+6, 12*86400/3) < online_good: print "Goodness",x
+Calamity 465
 
 2015-04-19 06:57:06 <idlerpg>   elijah [641/791] has challenged kelsey [20/714] in combat and won! 0 days, 12:46:22 is removed from elijah's clock.
 2015-04-19 06:57:06 <idlerpg>   elijah reaches next level in 3 days, 00:22:48.
@@ -267,6 +363,64 @@ The +2 implies 2 extra collisions (or one collision with pef).
 5
 => elijah=8 (excluding trogdor), kelsey=2 (excluding elijah), no idlerpg
 
+2015-04-19 07:22:26 <idlerpg>   j found a pair of Nikes! This wondrous godsend has accelerated them 0 days, 05:40:23 towards level 79.
+2015-04-19 07:22:26 <idlerpg>   j reaches next level in 3 days, 03:22:23.
+>>> count = 395200+100808*3+100806*2-4*3600*(3+2)+8+(3+31)+2
+>>> adjustments = 0
+>>> count += adjustments
+>>> online, online_good, online_evil = 13, 5, 2
+>>> for x in xrange(1200):
+>>>   if doit(count+6*(online-1)*x+1, 20*86400/3) < online: print "HOG",x
+>>>   if doit(count+6*(online-1)*x+2, 24*86400/3) < online: print "Team Battle",x
+>>>   if doit(count+6*(online-1)*x+3,  8*86400/3) < online: print "Calamity",x
+>>>   if doit(count+6*(online-1)*x+4,  4*86400/3) < online: print "Godsend",x
+>>>   if doit(count+6*(online-1)*x+5,  8*86400/3) < online_evil: print "Evilness",x
+>>>   if doit(count+6*(online-1)*x+6, 12*86400/3) < online_good: print "Goodness",x
+Godsend 1191
+
+1191??  That's way too late.  I expected it at
+>>> (25*60+20)/3.0
+506.6666666666667
+
+What's up?  Well, let's try to find a rand() call with the right positioning:
+>>> for x in xrange(count, count+100808):
+...   if doit(x, 4*86400/3) < online: print x-count
+
+
+Ooh, it worked this time.  Who got it?
+>>> base = count+6*(online-1)*1191+4
+>>> int(doit(base+1, online))
+1
+
+Um, amling?  It should have been 0 so it'd be j.  What kind of godsend?
+>>> int(doit(base+2, 10))
+4
+
+not 0, so a time rather than an item godsend.  That's good.  How much does
+the godsend affect the player's timing?
+>>> int(doit(base+3, 8))
+1
+
+Not very good; only a 6% bonus.  Does that match what was reported?
+>>> tot = 3*86400+3*3600+22*60+23
+>>> added = 5*3600+40*60+23
+>>> added/(tot+added+0.0)
+0.06999787500942536
+
+Nope, this is also off.  What kind of godsend was it?
+count = 1
+with open('../bot.v3.1.2/events.txt') as f:
+  for line in f:
+    if line.startswith('G'):
+      if doit(base+3+count, count) < 1:
+        print "SELECTED: "+line.rstrip()
+      count+=1
+SELECTED: G found a pair of Nikes
+SELECTED: G discovered a secret, underground passage
+SELECTED: G tamed a wild horse
+SELECTED: G was accepted into Pi Beta Phi
+
+way off.
 
 m=2**48
 a=0x5DEECE66D
