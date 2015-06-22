@@ -1,0 +1,325 @@
+def rand48(seed, ntimes=1):
+  a, m = 0x5DEECE66D, 2**48
+  for i in xrange(ntimes):
+    seed = int((a*seed+0xB)%m)
+  return seed
+def rand48inv(seed, ntimes=1):
+  ainv, m = 246154705703781, 2**48
+  for i in xrange(ntimes):
+    seed = int(ainv*(seed-c)%m)
+  return seed
+def fl(seed):
+  return (seed+0.0)/2**48
+
+answer_b = 112858162602330
+def doit(count, mult):
+  change = count-doit.current_count
+  if change<0:
+    doit.seed = rand48inv(doit.seed, -change)
+  else:
+    doit.seed = rand48(doit.seed, change)
+  doit.current_count = count
+  return fl(doit.seed)*mult
+
+doit.seed = answer_b
+doit.current_count = 0
+
+
+#2015-04-18 21:56:39 <idlerpg>   yzhou [352/879] has challenged nebkor [567/581] in combat and lost! 0 days, 15:18:52 is added to yzhou's clock.
+#2015-04-18 21:56:42 <idlerpg>   yzhou reaches next level in 9 days, 18:05:38.
+#2015-04-18 22:56:37 <idlerpg>   j [611/987] has challenged yzhou [770/879] in combat and lost! 0 days, 08:08:03 is added to j's clock.
+#2015-04-18 22:56:37 <idlerpg>   j reaches next level in 3 days, 17:28:34.
+#2015-04-18 23:56:41 <idlerpg>   elijah [34/791] has challenged pef [224/889] in combat and lost! 0 days, 09:07:58 is added to elijah's clock.
+#2015-04-18 23:56:41 <idlerpg>   elijah reaches next level in 3 days, 20:09:35.
+#2015-04-19 00:56:44 <idlerpg>   Sessile [186/1327] has challenged kverdieck [556/693] in combat and lost! 0 days, 09:57:27 is added to Sessile's clock.
+#2015-04-19 00:56:44 <idlerpg>   Sessile reaches next level in 4 days, 13:31:57.
+>>> doit(0, 879)
+352.43745673855665
+>>> doit(1, 581)
+567.4833910700091
+>>> doit(100806*1, 987)
+611.6301877722988
+>>> doit(100806*1+1, 879)
+770.5107393375936
+>>> doit(100806*2, 791)
+34.47358192933556
+>>> doit(100806*2+1, 889)
+224.80528875961028
+>>> doit(100806*3, 1327)
+186.64288238947785
+>>> doit(100806*3+1, 693)
+556.4967233271523
+
+>>> int(doit(-3, 12))
+9 == yzhou, with trodor excluded
+>>> int(doit(-2, 12))
+11 == nebkor, once yzhou removed
+>>> int(doit(-1, 12))
+10 -> not idlerpg (not 0)
+>>> for x in xrange(-3,0): int(doit(x+100806*1, 12))
+0
+9
+3
+=> j=0 (excluding trogdor), yzhou=9 after j removed, no idlerpg
+>>> for x in xrange(-3,0): int(doit(x+100806*2, 13-(x+1)%2))
+8
+10
+2
+=> elijah=8 (excluding trogdor), pef=10 after elijah removed, no idlerpg
+>>> for x in xrange(-3,0): int(doit(x+100806*3, 12))
+... 
+6
+4
+10
+=> Sessile=6 (excluding trogdor), kverdieck=4 after Sessile removed, no idlerpg
+
+So far:
+A ccmo [offline]
+0 j (!)
+1 amling
+2 kelsey (!)
+3 kniktas
+4 kverdieck (!)
+B sjp [offline]
+5 dlaw
+6 Sessile (!)
+7 Atychiphobe
+8 trogdor (!)
+9 elijah (!)
+10 yzhou (!)
+11 pef (!)
+12 nebkor (!)
+
+#2015-04-19 01:23:13 <idlerpg>   j, kelsey, elijah, and yzhou have been chosen by the gods to rescue the beautiful princess Juliet from the grasp of the beast Grabthul. Participants must first reach [167,458], then [325,270].
+
+This is 26 min, 29 sec after the last battle, which isn't divisible by 3.  So
+let's roll down to 26 min, 27 sec.  Also, my normal method of counting (all
+The +2 implies 2 extra collisions (or one collision with pef)the
+100806*n thingys above) is counting from attacker roll to attacker roll.  Thus,
+I need to get past the attacker and defender and mystery rolls (it shoulda been
+100805*n, not 100806*n, but the numbers clearly show 100806*n is correct so
+clearly there is a mystery roll).  So I first need to add three then add the
+(2+2*#online)*#secs rolls:
+
+>>> (100806*3) + (3) + (2*14*(26*60+27))
+346857
+
+Now, of the 13 people online at the time, the selections for questers would be:
+>>> whoidx = range(13)
+>>> for idx,count in enumerate(xrange(13,4,-1)): devnull=whoidx.pop(int(doit(346857+idx, count)))
+>>> whoidx
+[0, 2, 9, 10]
+
+Which would imply j, kelsey, elijah, and yzhou should be selected for the quest
+and they were.  Yaay!  Also, the selection of quest type would be:
+
+>>> count, randcount = 1, 0
+>>> with open('../bot.v3.1.2/events.txt') as f:
+>>>   for line in f:
+>>>     if line.startswith('Q'):
+>>>       if doit(346857+9+randcount, count) < 1:
+>>>         print "SELECTED: "+line.rstrip()
+>>> 	if line.startswith('Q1'):
+>>> 	  randcount += 1
+>>>       randcount+=1
+>>>       count+=1
+>>> randcount
+SELECTED: Q2 225 415 280 460 lay waste to the Towers of Ankh-Allor, wherein lies the terrible sorceror Croocq
+SELECTED: Q2 480 415 325 270 return the stolen relics of Iao-Sabao to the city of Velvragh, quieting the religious riot that has sprung up from their loss
+SELECTED: Q2 167 458 325 270 rescue the beautiful princess Juliet from the grasp of the beast Grabthul
+17
+
+Yaay, the right quest was selected!
+
+#2015-04-19 01:56:48 <idlerpg>   kelsey [633/714] has challenged nebkor [387/581] in combat and won! 1 day, 07:50:20 is removed from kelsey's clock.
+#2015-04-19 01:56:48 <idlerpg>   kelsey reaches next level in 8 days, 21:04:37.
+
+For the remaining 33 min, 33 sec, we only have 2+(2*9+1*4)=2*(#online-1) rand() 
+rolls per second instead of the usual 2*14=2*(#online+1).  This difference is
+due to the four questers only getting one rand() roll per second instead of the
+typical 4.  Also, we want to move past the selection of combatants, so we need
+to add another 3 to get to the attacker roll.  We find:
+>>> (100806*3) + (3) + 9+17 + (2*14*(26*60+27)) + (2*12*(33*60+33)) + (3)
+395198
+
+Using that for the attacker and defender rolls:
+>>> int(doit(395198, 714)), int(doit(395198+1, 581))
+(658, 175)
+Hmm, were there some map collisions?  Let's try a few extra:
+>>> int(doit(395199, 714)), int(doit(395199+1, 581))
+(215, 515)
+>>> int(doit(395200, 714)), int(doit(395200+1, 581))
+(633, 387)
+Yep, that looks right.  Also, the selection of combatants:
+>>> int(doit(395197, 12)), int(doit(395198, 12)), int(doit(395199, 12))
+(2, 11, 3)
+Which corresponds to kelsey and nebkor (nebkor is usually #12, but recall that
+trogdor is removed from the possible selections in the first roll since he's
+not level 45 yet, and kelsey is removed from the second roll because we don't
+want someone attacking themselves).  The three means nebkor isn't replaced with
+idlerpg.
+
+If we hadn't done all the work of determining the exact number of rand() calls
+in the quest or weren't sure at which 3-second mark it actually started, we
+could have done a search:
+
+>>> valueb = rand48(answer_b, 100806*3)
+>>> fl(valueb)*1327
+186.64288238947785
+>>> for x in xrange(100806*2):
+...   cur = valueb
+...   valueb = rand48(valueb, 1)
+...   if int(fl(cur)*714)==633 and int(fl(valueb)*581)==387:
+...     print "Found: ", x+100806*3
+... 
+Found:  395200
+
+>>> int(doit(395200, 714)), int(doit(395200+1, 581))
+(633, 387)
+
+In summary, a quest involves:
+  * (#online-4) rand calls to determine who will be questers
+  * 17 (`grep -c ^Q events.txt`) rand() calls to determine which quest to use
+  * an additional rand() call everytime a Q1 quest is chosen (the algorithm
+    chooses quests probabilistically, the first at 100% probability, the second
+    at 50%, the third at 33%, etc., always having the last chosen quest
+    overwrite info from previous "chosen" quests.  Hence, many are chosen but
+    few are used.)
+
+Now, the last battle was won, so use 100808 instead of 100806.  Also, 1 fewer
+rand() call per quester per second.  So the next few results are:
+
+#2015-04-19 02:56:53 <idlerpg>   nebkor [449/581] has challenged elijah [364/791] in combat and won! 3 days, 10:51:38 is removed from nebkor's clock.
+#2015-04-19 02:56:53 <idlerpg>   nebkor reaches next level in 16 days, 20:33:17.
+>>> doit(395200+100808-4*3600, 581)
+449.7277484220751
+>>> doit(395200+100808-4*3600+1, 791)
+364.011099735354
+>>> for x in xrange(-3,0): int(doit(x+395200+100808-4*3600, 12))
+11
+9
+8
+=> nebkor=11 (excluding trogdor), elijah=9 (excluding nebkor), no idlerpg
+
+#2015-04-19 03:56:56 <idlerpg>   kelsey [2/714] has challenged elijah [691/791] in combat and lost! 0 days, 21:06:27 is added to kelsey's clock.
+#2015-04-19 03:56:56 <idlerpg>   kelsey reaches next level in 9 days, 16:10:57.
+>>> doit(395200+2*(100808-4*3600), 714)
+2.3456289638535424
+>>> doit(395200+2*(100808-4*3600)+1, 791)
+691.847304324295
+>>> for x in xrange(-3,0): int(doit(x+395200+2*(100808-4*3600), 12))
+2
+8
+8
+=> kelsey=2 (excluding trogdor), elijah=8 (excluding kelsey), no idlerpg
+
+#2015-04-19 04:56:59 <idlerpg>   nebkor [54/581] has challenged kverdieck [398/693] in combat and lost! 1 day, 16:15:19 is added to nebkor's clock.
+#2015-04-19 04:56:59 <idlerpg>   nebkor reaches next level in 18 days, 10:48:30.
+>>> doit(395200+100808*2+100806*1-4*3600*(2+1), 581)
+54.70419565413121
+>>> doit(395200+100808*2+100806*1-4*3600*(2+1)+1, 693)
+398.01276403586144
+>>> for x in xrange(-3,0): int(doit(x+395200+100808*2+100806*1-4*3600*(2+1), 12))
+11
+4
+3
+=> nebkor=11 (excluding trogdor), kverdieck=4 (excluding nebkor), no idlerpg
+
+#2015-04-19 05:07:09 <idlerpg>   amling [70/369] has come upon sjp [71/608] and been defeated in combat! 0 days, 09:41:32 is added to amling's clock.
+#2015-04-19 05:07:09 <idlerpg>   amling reaches next level in 4 days, 10:37:00.
+random battle -- try to predict later
+
+#2015-04-19 05:57:03 <idlerpg>   pef [261/889] has challenged trogdor [34/418] in combat and won! 0 days, 01:20:00 is removed from pef's clock.
+#2015-04-19 05:57:03 <idlerpg>   pef reaches next level in 0 days, 12:00:04.
+>>> doit(395200+100808*2+100806*2-4*3600*(2+2)+7, 889)
+261.2591994550055
+>>> doit(395200+100808*2+100806*2-4*3600*(2+2)+8, 418)
+34.93666032467125
+>>> for x in xrange(-3,0): int(doit(x+395200+100808*2+100806*2-4*3600*(2+2)+7, 12))
+10
+8
+4
+=> pef=10 (excluding trogdor), trogdor=8, no idlerpg
+
+
+The +7 implies there was at least 1 collision that did not result in a
+battle (or other unseen rand() calls) as the collision fight should
+only use 5-6 rand() calls -- 1 to determine whether the collision
+should result in a fight, and 4-5 for the actual fight.
+
+#2015-04-19 06:20:19 <idlerpg>   Sessile was caught in a terrible snowstorm. This terrible calamity has slowed them 0 days, 06:14:54 from level 81.
+#2015-04-19 06:20:19 <idlerpg>   Sessile reaches next level in 4 days, 14:23:16.
+This will add 3+(#calamity-types) rand() calls
+
+2015-04-19 06:57:06 <idlerpg>   elijah [641/791] has challenged kelsey [20/714] in combat and won! 0 days, 12:46:22 is removed from elijah's clock.
+2015-04-19 06:57:06 <idlerpg>   elijah reaches next level in 3 days, 00:22:48.
+>>> doit(395200+100808*3+100806*2-4*3600*(3+2)+8+(3+31)+2, 791)
+641.7221793230374
+>>> doit(395200+100808*3+100806*2-4*3600*(3+2)+8+(3+31)+3, 714)
+20.970651259624454
+
+The +2 implies 2 extra collisions (or one collision with pef).
+
+>>> for x in xrange(-3,0): int(doit(x+395200+100808*3+100806*2-4*3600*(3+2)+8+(3+31)+2, 12))
+... 
+8
+2
+5
+=> elijah=8 (excluding trogdor), kelsey=2 (excluding elijah), no idlerpg
+
+
+m=2**48
+a=0x5DEECE66D
+
+a^{-1} (mod m)
+
+          m =       a*11163 + 1004285185
+25214903917 = 1004285185*25 + 107774292
+ 1004285185 = 107774292 * 9 + 34316557
+  107774292 = 34316557  * 3 + 4824621
+   34316557 = 4824621	* 7 + 544210
+    4824621 = 544210 	* 8 + 470941
+     544210 = 470941 	* 1 + 73269
+     470941 = 73269  	* 6 + 31327
+      73269 = 31327  	* 2 + 10615
+      31327 = 10615  	* 2 + 10097
+      10615 = 10097  	* 1 + 518
+      10097 = 518    	*19 + 255
+        518 = 255    	* 2 + 8
+        255 = 8      	*31 + 7
+          8 = 7      	* 1 + 1
+
+1 = 8 - 1*7
+  = 8 - 1*(255-31*8)
+  = 32*8 - 1*255
+  = 32*(518-255*2) - 1*255
+  = 32*518 - 65*255
+  = 32*518 - 65*(10097 - 19*518)
+  = 1267*518 - 65*10097
+  = 1267*(10615-10097) - 65*10097
+  = 1267*10615 - 1332*10097
+  = 1267*10615 - 1332*(31327-2*10615)
+  = 3931*10615 - 1332*31327
+  = 3931*(73269-2*31327) - 1332*31327
+  = 3931*73269 - 9194*31327
+  = 3931*73269 - 9194*(470941-6*73269)
+  = 59095*73269 - 9194*470941
+  = 59095*(544210-470941) - 9194*470941
+  = 59095*544210 - 68289*470941
+  = 59095*544210 - 68289*(4824621-8*544210)
+  = 605407*544210 - 68289*4824621
+  = 605407*(34316557-7*4824621) - 68289*4824621
+  = 605407*34316557 - 4306138*4824621
+  = 605407*34316557 - 4306138*(107774292-3*34316557)
+  = 13523821*34316557 - 4306138*107774292
+  = 13523821*(1004285185-9*107774292) - 4306138*107774292
+  = 13523821*1004285185 -126020527*107774292
+  = 13523821*1004285185 -126020527*(25214903917-25*1004285185)
+  = 3164036996*1004285185 -126020527*25214903917
+  = 3164036996*(m-11163*a) -126020527*25214903917
+  = 3164036996*m  - 35320271006875*a
+
+ainv = - 35320271006875 % m = 246154705703781
+
+[newren@localhost idlerpg]$ grep -A99999999 'BEGIN LOGGING.*Apr..1' ~/.xchat2/xchatlogs/Palantir-#idlerpg.log | grep -o 'idlerpg.*have been chosen' | colrm 1 16 | sed -e s/have.been.chosen// -e 's/^/1 /' -e 's/, and/\n4/' -e 's/, /\n2 /' -e 's/, /\n3 /' | sort -k 2 | uniq -c | less
+
