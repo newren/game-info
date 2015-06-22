@@ -1,0 +1,174 @@
+Direct rand() calls
+-------------------
+  parse:
+    register
+      2
+  hog
+    3
+  rpcheck
+    6 + 1/hour (battle) if enough online
+  challenge_opp (1, 4, 6, or 7)
+    if user level < 25 extra 1 with high probability of early exit
+    4
+    2 if win
+    1 if win && not crit && steal successful
+  team_battle
+    2 + (#online - 6)
+  collision_fight
+    2
+    2 if win
+    1 if win && not crit && steal successful
+  find_item
+    1 + int(1.5*level) + 2..9
+  moveplayers
+    loop of 3
+      if quest_type == 2
+        0 if players reach either destination point; otherwise:
+        per non-quester player:
+          2
+          1 if collision
+          1 more if collision into admin
+        per quester player:
+          1
+      if no quest or quest_type == 1
+        per player:
+          2
+          1 if collision
+          1 more if collision into admin
+  mksalt
+    2
+  calamity/godsend
+    3
+    # calamity/godsend possibilities, if 2nd random value is 90% case
+  quest
+    (#online - 4)
+    # quest possibilities
+    1 extra if time-based quest
+  goodness
+    1 + (#good online - 2)
+  evilness
+    4 if stealing; 3 otherwise
+  fisher_yates_shuffle
+    1 per length of array
+
+Where things get called from:
+------------
+  parse
+    outer while(1)
+  hog
+    parse() [if summoned by admin, which never has been, and would be notified]
+    rpcheck()
+  rpcheck
+    outer while(1)
+  challenge_opp
+    rpcheck() [1x per hour]
+    rpcheck() [player levelling]
+  team_battle
+    rpcheck()
+  collision_fight
+    moveplayers() [quest_type == 2]
+    moveplayers() [quest_type != 2 or !questers]
+  find_item
+    rpcheck() [player levelling]
+  moveplayers
+    rpcheck()
+  mksalt
+    parse() [if registering new user]
+    parse() [if chpass, which only admin can do]
+    parse() [if newpass, which anyone can do]
+  calamity/godsend
+    rpcheck()
+  quest
+    rpcheck()
+  goodness
+    rpcheck()
+  evilness
+    rpcheck()
+  fisher_yates_shuffle
+    team_battle
+
+Top-down calls:
+--------------------
+  outer while(1)
+    parse()
+      hog() [if summoned by admin, which never has been and we'd be notified]
+      register: 2 + mksalt()
+      chpass: mksalt()
+      newpass: mksalt()
+    rpcheck() [if been 3 seconds since last check, that is]
+      hog()
+      team_battle()
+        fisher_yates_shuffle()
+      calamity()
+      godsend()
+      evilness()
+      goodness()
+      moveplayers()
+        collision_fight()
+      quest()         [if time for quest to start]
+      challenge_opp() [1x per hour]
+      levelling:
+        find_item()
+        challenge_opp()
+  
+Top-down rand calls:
+--------------------
+  outer while(1)
+    parse()
+      3 - summon hog
+        3 - hog
+      2 - register
+        2 - mksalt
+      2 - chpass
+        2 - mksalt
+      2 - newpass
+        2 - mksalt
+    rpcheck() [if been 3 seconds since last check, that is]
+      1,4 - check hog
+        3 - hog()
+      1,3+#online - check team_battle
+        2+#online - team_battle()
+          6 - fisher_yates_shuffle()
+      1,4,4+#calamity possibilities - check calamity
+        3,3+#calamity possibilities - calamity()
+      1,4,4+#godsend possibilities - check godsend
+        3,3+#godsend possibilities - godsend()
+      1,4,5 - check evilness
+        3,4 - evilness()
+      1, #goodOnline - check goodness
+        -1+#goodOnline - goodness()
+      ? - moveplayers()
+        2,4,5 - collision_fight()
+      -4+#online+#quest possiblilities,<same>+1 - start quest [when start time]
+        -4+#online+#quest possiblilities,<same>+1 - quest()
+      2,5,7,8 - deciding to challenge_opp [1x per hour]
+        1,4,6,7 - challenge_opp()
+      levelling:
+        3..10 + int(1.5*level) - find_item()
+        1,4,6,7 - challenge_opp()
+
+Standard case:
+--------------
+  Every 3 "seconds":
+    6 + 6*#online
+      
+Invisible rand calls
+--------------------
+Cannot determine even if we know rand seed:
+  collisions not resulting in fights (1 or 2 each)
+Can only know if it happend if we know the rand seed:
+  find_item -- how many rolls made for higher level things
+  unsuccesful stealing when evil
+
+
+Good place to start:
+--------------------
+2015-04-09 05:43:38 <idlerpg>   Sessile [418/1327] has challenged dlaw [227/877] in combat and won! 1 day, 00:54:47 is removed 
+from Sessile's clock.
+2015-04-09 05:43:38 <idlerpg>   Sessile reaches next level in 4 days, 10:12:32.
+2015-04-09 05:43:38 <idlerpg>   Sessile has dealt dlaw a Critical Strike! 1 day, 10:24:22 is added to dlaw's clock.
+2015-04-09 05:43:38 <idlerpg>   dlaw reaches next level in 13 days, 09:07:30.
+2015-04-09 05:52:15 <idlerpg>   The local wizard imbued yzhou's pants with a Spirit of Fortitude! yzhou's set of leggings gains 10% effectiveness.
+2015-04-09 06:43:42 <idlerpg>   dlaw [771/877] has challenged trogdor [217/365] in combat and won! 1 day, 08:00:44 is removed from dlaw's clock.
+2015-04-09 06:43:42 <idlerpg>   dlaw reaches next level in 12 days, 00:06:43.
+
