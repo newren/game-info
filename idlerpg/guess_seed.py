@@ -44,7 +44,7 @@ class Random:
           map2 = int((a*s+c)%m)
           assert map2-a < new_interval[0]
           assert map2 > new_interval[0] and map2 < new_interval[1]
-        while map2 < new_interval[1] and s<=interval[1]:
+        while map2 <= new_interval[1] and s<=interval[1]:
           yield s, 1, ((s, 0), 1)
           s += 1
           map2 += a
@@ -89,19 +89,17 @@ class Random:
           for s, prevn, camefrom in grouped_values:
             # Check whether this value works
             map2 = int((an*s+rest)%m)
-            if map2 > interval[0] and map2 < interval[1]:
+            if map2 >= interval[0] and map2 <= interval[1]:
               yield s, n, (camefrom,n)
       # Get the next set of values to work on
       nextvalues = list(itertools.islice(values, 512))
 
   @staticmethod
   def niter_constrained_less(r, p, values, min_rands, num_to_do):
-    # The ONLY differences between niter_matches and niter_constrained_less
-    # are:
-    #   1) interval calculated with r-1
-    #   2) the if-condition check on the map2 value
+    # The ONLY difference between niter_matches and niter_constrained_less is:
+    #   * the if-condition check on the map2 value
     m = Random.m
-    interval = Random.calculate_interval(r-1,p)
+    interval = Random.calculate_interval(r,p)
 
     # Work on a set of values at a time
     nextvalues = list(itertools.islice(values, 512))
@@ -119,7 +117,7 @@ class Random:
           for s, prevn, camefrom in grouped_values:
             # Check whether this value works
             map2 = int((an*s+rest)%m)
-            if map2 < interval[1]:
+            if map2 < interval[0]:
               yield s, n, (camefrom,n)
       # Get the next set of values to work on
       nextvalues = list(itertools.islice(values, 512))
