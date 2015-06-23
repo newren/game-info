@@ -186,8 +186,6 @@ class Random:
       limiters.append(['equal', rolls[lvl  ][0], rolls[lvl  ][1],
                                 7200*(1+num_players)+battle_rolls-1, 1+hrc])
       limiters.append(['equal', rolls[lvl+1][0], rolls[lvl+1][1], 1, 1])
-    for limiter in limiters:
-      print limiter
     return Random.compute_possibilities(limiters)
 
   def set_seed(self, seed):
