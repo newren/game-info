@@ -296,14 +296,15 @@ def handle_original_case_a():
   #    227/877
   #    CS : 0/50 (1 out of 50, means given 50 roll a 0)
   #    Gain : 12%  (7/20)
-  # 13 players, 1 godsend, 7 battle_rolls but 3 counted: ((1+13)*7200)+(3)+(7-3)
+  # 13 players, 1 godsend, 7 battle_rolls but 3 counted: ((1+13)*7200)+(3+22)+(7-3)
   # 13 players, 1 calamity, 7 battle_rolls but 1 counted: ((1+13)*7200)+(3+31)+(7-1)
   limiters = [
               ['equal', 418, 1327, 1, 1],
               ['equal', 227,  877, 1, 1],
               ['less',    1,   50, 1, 1],
               ['equal',   7,   20, 1, 1],
-              ['equal', 771,  877, ((1+13)*7200)+(3)+(7-3)-10, 40],
+              # -10 is just trying to see if there was a weird miscount...
+              ['equal', 771,  877, ((1+13)*7200)+(3+22)+(7-3)-10, 40],
               ['equal', 217,  365, 1, 1],
               ['equal', 701,  889, ((1+13)*7200)+(3+31)+(7-1)-10, 40],
               ['equal', 136,  366, 1, 1]
