@@ -177,7 +177,7 @@ class Random:
 
   @staticmethod
   def compute_possibilities_from_hourly_battles(num_players, rolls):
-    hrc = 1 # hidden rand calls, such as from map collisions
+    hrc = 1 # hidden rand calls, such as from map collisions or mystery rolls
     assert(len(rolls)%2==0)
     limiters =     [['equal', rolls[0][0], rolls[0][1], 1, 1]]
     limiters.append(['equal', rolls[1][0], rolls[1][1], 1, 1])
@@ -294,26 +294,61 @@ def handle_original_case_a():
   #    227/877
   #    CS : 0/50 (1 out of 50, means given 50 roll a 0)
   #    Gain : 12%  (7/20)
-  # 13 players, 1 godsend, 7 battle_rolls but 3 counted: ((1+13)*7200)+(3+22)+(7-3)
-  # 13 players, 1 calamity, 7 battle_rolls but 1 counted: ((1+13)*7200)+(3+31)+(7-1)
+  # 13 players, 1 item godsend, 7 battle_rolls but 3 counted: ((1+13)*7200)+(3)+(7-3)
+  # 13 players, 1 time calamity, 7 battle_rolls but 1 counted: ((1+13)*7200)+(3+31)+(7-1)
   limiters = [
               ['equal', 418, 1327, 1, 1],
               ['equal', 227,  877, 1, 1],
-              ['less',    1,   50, 1, 1],
+              # There IS a mystery rand() call in the version of challenge_opp()
+              # running at Palantir and it comes BEFORE the crit-check.  So, the
+              # crit-check rand() call is TWO after the defender rand() roll.
+              ['less',    1,   50, 2, 1],
               ['equal',   7,   20, 1, 1],
-              # -10 is just trying to see if there was a weird miscount...
-              ['equal', 771,  877, ((1+13)*7200)+(3+22)+(7-3)-10, 40],
+              ['equal', 771,  877, ((1+13)*7200)+(3)+(7-3), 5],
               ['equal', 217,  365, 1, 1],
-              ['equal', 701,  889, ((1+13)*7200)+(3+31)+(7-1)-10, 40],
+              ['equal', 701,  889, ((1+13)*7200)+(3+31)+(7-1), 5],
               ['equal', 136,  366, 1, 1]
              ]
   print(list(Random.compute_possibilities(limiters)))
-  # answer: failed to find; don't know why
+  # answer: [(88813367205766, 201654, ((((((((88813367205766, 0), 1), 3), 4), 100811), 100812), 201653), 201654))]
+
+  # The way I discovered the mystery rand() call was failing to find any solution
+  # here, finding a solution with four sequential lost battles which uniformly
+  # showed one more rand() call than expected.  That could have been "luck" from
+  # random collisions, but advancing that rand seed forward to check for other
+  # battles showed that the one extra roll always seemed to be there -- for both
+  # wins and losses.  So I knew there was a mystery rand() call, though for some
+  # reason I assumed it came after the crit-check and steal-check and whatnot.
+  # Then I traced the rand seed backward to this particular battle only looking
+  # at attacker and defender rolls.  That gave me a seed.  Using that seed, the
+  # roll after the defender roll didn't satisfy the crit check.  Horribly
+  # disappointed yet again, I checked the one after it to see if I at least
+  # got 7/20.  When I saw the value 0.20, a light went on.  What if the mystery
+  # roll where immediately after the defender roll?  Some simple checking showed
+  # that this theory provided a solution:
+  ## >>> doit(-22465140+0, 1327)
+  ## 418.70627243430465
+  ## >>> (doit.seed, doit.current_count)
+  ## (88813367205766, -22465140)
+  ## >>> doit(-22465140+1, 877)
+  ## 227.48926350285697
+  ## >>> doit(-22465140+3, 50)   # +3 because mystery roll is BEFORE crit-check
+  ## 0.5181060083023326
+  ## >>> doit(-22465140+4, 20)
+  ## 7.265487860984905
+  ## >>> doit(-22465140+100811, 877)         # 100811 obtained elsewhere
+  ## 771.2186812479423
+  ## >>> doit(-22465140+100812, 365)
+  ## 217.38324898535328
+  ## >>> doit(-22465140+100811+100842, 889)  # 100842 also obtained elsewhere
+  ## 701.7135076356064
+  ## >>> doit(-22465140+100811+100842+1, 366)
+  ## 136.62686666197257
   raise SystemExit("I quit.")
 
 #handle_local_case_a()
-handle_original_case_b()
-#handle_original_case_a()
+#handle_original_case_b()
+handle_original_case_a()
 
 if False:
   seeds = []
