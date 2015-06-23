@@ -182,7 +182,7 @@ class Random:
     limiters =     [['equal', rolls[0][0], rolls[0][1], 1, 1]]
     limiters.append(['equal', rolls[1][0], rolls[1][1], 1, 1])
     for lvl in xrange(2,len(rolls),2):
-      battle_rolls = 7 if rolls[lvl-2][0] > rolls[lvl-1][0] else 5
+      battle_rolls = 8 if rolls[lvl-2][0] > rolls[lvl-1][0] else 6
       limiters.append(['equal', rolls[lvl  ][0], rolls[lvl  ][1],
                                 7200*(1+num_players)+battle_rolls-1, 1+hrc])
       limiters.append(['equal', rolls[lvl+1][0], rolls[lvl+1][1], 1, 1])
@@ -294,8 +294,8 @@ def handle_original_case_a():
   #    227/877
   #    CS : 0/50 (1 out of 50, means given 50 roll a 0)
   #    Gain : 12%  (7/20)
-  # 13 players, 1 item godsend, 7 battle_rolls but 3 counted: ((1+13)*7200)+(3)+(7-3)
-  # 13 players, 1 time calamity, 7 battle_rolls but 1 counted: ((1+13)*7200)+(3+31)+(7-1)
+  # 13 players, 1 item godsend, 8 battle_rolls but 4 counted: ((1+13)*7200)+(3)+(8-4)
+  # 13 players, 1 time calamity, 8 battle_rolls but 1 counted: ((1+13)*7200)+(3+31)+(8-1)
   limiters = [
               ['equal', 418, 1327, 1, 1],
               ['equal', 227,  877, 1, 1],
@@ -304,9 +304,9 @@ def handle_original_case_a():
               # crit-check rand() call is TWO after the defender rand() roll.
               ['less',    1,   50, 2, 1],
               ['equal',   7,   20, 1, 1],
-              ['equal', 771,  877, ((1+13)*7200)+(3)+(7-3), 5],
+              ['equal', 771,  877, ((1+13)*7200)+(3)+(8-4), 5],
               ['equal', 217,  365, 1, 1],
-              ['equal', 701,  889, ((1+13)*7200)+(3+31)+(7-1), 5],
+              ['equal', 701,  889, ((1+13)*7200)+(3+31)+(8-1), 5],
               ['equal', 136,  366, 1, 1]
              ]
   print(list(Random.compute_possibilities(limiters)))
