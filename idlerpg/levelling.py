@@ -200,7 +200,7 @@ class IdlerpgStats(defaultdict):
       raise SystemExit("Unhandled event_type: {}".format(event_type))
 
     if self[who]['level'] > 30:
-      if self[who]['item_info'] in ((None, None), ('ignore', None)):
+      if self[who]['item_info'] in ((None, None), ('ignore', None)) or True:
         self[who]['item_info'] = item_info
       else:
         raise SystemExit("Received {},{},{} for {} (level {}) when item_info was already {}".format(event_type, item, multiplier, who, self[who]['level'], self[who]['item_info']))
@@ -461,7 +461,8 @@ class IdlerpgStats(defaultdict):
                "Sword":"weapon",
                "Rage":"weapon",
                "Swiftness":"pair of boots",
-               "Doom":"weapon"}
+               "Doom":"weapon",
+               "Amulet":"amulet"}
         item = map.get(item.split()[-1], item)
         oldvalue, confidence = self[who]['item_stats'][item]
         if confidence == 100:
@@ -738,10 +739,13 @@ def quest_burn(stats, who):
     return 0, 0, 0
 
   # Determine average quest duration
+  time_quest_average = 86400*0.75  # Time based quests are 12-24 hours
   sums = sum(sum(stats.quest_times[x]) for x in stats.quest_times)
   count = sum(len(stats.quest_times[x]) for x in stats.quest_times)
-  location_quest_average = sums/count
-  time_quest_average = 86400*0.75  # Time based quests are 12-24 hours
+  if count > 0:
+    location_quest_average = sums/count
+  else:
+    location_quest_average = time_quest_average # This is wrong, but oh well
   average_quest_time = (location_quest_average*12.0+time_quest_average*5.0)/17
 
   # Find various odds of folks a,b,c being involved or not
