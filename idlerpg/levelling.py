@@ -359,7 +359,7 @@ class IdlerpgStats(defaultdict):
       if m:
         for who in self:
           if self[who]['online'] != None:
-            self[who]['last_logbreak_seen'] = epoch
+            self[who]['last_logbreak_seen'] = epoch  # FIXME: Should be epoch of reopening
           self.ensure_offline(who, epoch, known_offline=False)
         continue
 
