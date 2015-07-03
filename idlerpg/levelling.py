@@ -1339,7 +1339,8 @@ rpgstats.add_log('/home/newren/.xchat2/xchatlogs/Palantir-idlerpg.log',
                  translate_you='elijah')
 rpgstats.add_log('/home/newren/irclogs/Palantir/idlerpg.log',
                  translate_you='elijah')
-os.system('rsync -a pt-scm-staging-01:irclogs/Palantir/ /home/newren/irclogs/Palantir-yellow/')
+if subprocess.check_output(['hostname']).strip() != 'localhost.localdomain':
+  os.system('rsync -a pt-scm-staging-01:irclogs/Palantir/ /home/newren/irclogs/Palantir-yellow/')
 rpgstats.add_log('/home/newren/irclogs/Palantir-yellow/idlerpg.log',
                  translate_you='Atychiphobe')
 # We want 'You found a level X <item>!' messages to come before the 'Y has attained level Z!'
