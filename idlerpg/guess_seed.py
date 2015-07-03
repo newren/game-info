@@ -177,7 +177,7 @@ class Random:
 
   @staticmethod
   def compute_possibilities_from_hourly_battles(num_players, rolls):
-    hrc = 1 # hidden rand calls, such as from map collisions or mystery rolls
+    hrc = 10 # hidden rand calls, such as from map collisions or mystery rolls
     assert(len(rolls)%2==0)
     limiters =     [['equal', rolls[0][0], rolls[0][1], 1, 1]]
     limiters.append(['equal', rolls[1][0], rolls[1][1], 1, 1])
@@ -344,9 +344,44 @@ def handle_original_case_a():
   ## 136.62686666197257
   raise SystemExit("I quit.")
 
+def handle_early_april_case():
+  rolls = [[597,  684], [ 79, 1208],
+           [201,  439], [ 71,  553],
+           [814,  904], [329,  835],
+           [212,  553], [398,  439]]
+  print(list(Random.compute_possibilities_from_hourly_battles(15, rolls)))
+  # answer: [(245748858511197, 345628, ((((((((245748858511197, 0), 1), 115211), 115212), 230419), 230420), 345627), 345628))]
+  raise SystemExit("done.")
+
+def handle_funny_case():
+  ##                                  2015-04-21 21:34:59 <idlerpg>  amling, kverdieck, Sessile, and yzhou have completed their journey! 25% of their burden is eliminated.
+  ##                                  2015-04-21 21:53:59 <idlerpg>  yzhou [186/879] has come upon amling [94/369] and taken them in combat! 0 days, 08:54:32 is removed from yzhou's clock.
+  ##                                  2015-04-21 21:53:59 <idlerpg>  yzhou reaches next level in 3 days, 00:04:55.
+  ##  59570471548846   6852276  99784 2015-04-21 22:00:41 <idlerpg>  pef [188/889] has challenged yzhou [584/879] in combat and lost! 4 days, 20:55:24 is added to pef's clock.
+  ##                                  2015-04-21 22:00:41 <idlerpg>  pef reaches next level in 53 days, 14:09:29.
+  ## 122335122154465   6957173 104897 2015-04-21 23:00:44 <idlerpg>  kelsey [310/714] has challenged trogdor [187/418] in combat and won! 0 days, 08:50:06 is removed from kelsey's clock.
+  ##                                  2015-04-21 23:00:44 <idlerpg>  kelsey reaches next level in 2 days, 23:29:01.
+  ## 245036831844132   7068290 111117 2015-04-22 00:00:47 <idlerpg>  pef [773/889] has challenged elijah [274/791] in combat and won! 9 days, 02:18:23 is removed from pef's clock.
+  ##                                  2015-04-22 00:00:47 <idlerpg>  pef reaches next level in 44 days, 09:51:00.
+  ##  28883331871975   7176299 108009 2015-04-22 01:00:51 <idlerpg>  yzhou [90/879] has challenged pef [54/889] in combat and won! 0 days, 13:06:13 is removed from yzhou's clock.
+  ##                                  2015-04-22 01:00:51 <idlerpg>  yzhou reaches next level in 2 days, 07:51:49.
+  ## 256385259375727   7284307 108008 2015-04-22 02:00:55 <idlerpg>  nebkor [529/581] has challenged Sessile [79/1327] in combat and won! 5 days, 22:53:11 is removed from nebkor's clock.
+  ##                                  2015-04-22 02:00:55 <idlerpg>  nebkor reaches next level in 23 days, 19:32:44.
+
+  rolls = [[188,889], [584,879],
+           [310,714], [187,418],
+           [773,889], [274,791],
+           [ 90,879], [ 54,889],
+           [529,581], [ 79,1327]]
+  print(list(Random.compute_possibilities_from_hourly_battles(15, rolls)))
+  # answer: [(245748858511197, 345628, ((((((((245748858511197, 0), 1), 115211), 115212), 230419), 230420), 345627), 345628))]
+  raise SystemExit("done.")
+
 #handle_local_case_a()
 #handle_original_case_b()
-handle_original_case_a()
+#handle_original_case_a()
+#handle_early_april_case()
+handle_funny_case()
 
 if False:
   seeds = []
