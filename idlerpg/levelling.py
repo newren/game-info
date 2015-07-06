@@ -345,13 +345,24 @@ class IdlerpgStats(defaultdict):
       #
 
       # Just a single user quitting
-      m = re.match(r'(?P<nick>.*) has (?:quit|left)', line)
+      m = re.match(r'(?P<nick>.*) \[.*\] has (?:quit|left)', line)
       if m:
         who = self.player.get(m.group('nick'))
+        if not who:
+          # We don't know which player just left because we don't have a mapping from
+          # this player's irc nick to their character name.  But lots of people use
+          # the same for both, so try that.
+          if m.group('nick') in self:
+            who = m.group('nick')
         if who in self:
           if self[who]['online']:
             self[who]['timeleft'] += 20*1.14**self[who]['level']
           self.ensure_offline(who, epoch, known_offline=True)
+        else:
+          pass
+          # We know that a player left, but not which one.  We could spam the output,
+          # but I don't want to bother...
+          #print "Unknown user {}".format(m.group('nick'))
         continue
 
       # I got disconnected somehow
