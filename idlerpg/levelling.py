@@ -1358,7 +1358,8 @@ def parse_args(rpgstats):
 
 
 rpgstats = IdlerpgStats()
-os.system('rsync -a pt-scm-staging-01:irclogs/Palantir/ /home/newren/irclogs/Palantir-yellow/')
+if subprocess.check_output(['hostname']).strip() != 'localhost.localdomain':
+  os.system('rsync -a pt-scm-staging-01:irclogs/Palantir/ /home/newren/irclogs/Palantir-yellow/')
 rpgstats.add_log('/home/newren/irclogs/Palantir-yellow/idlerpg.log',
                  translate_you='Atychiphobe')
 #os.system('rsync -a gerrit-ro@pt-scm-staging-01:irclogs/Palantir/ /home/newren/irclogs/Palantir-elijah/')
