@@ -6,6 +6,7 @@ import operator
 import math
 import re
 import sys
+import time
 from collections import Counter
 import multiprocessing
 
@@ -150,7 +151,7 @@ class Random:
     assert limiters[1][0]=='equal' and limiters[1][3]==1 and limiters[1][4]==1
     primary = Random.calculate_interval(limiters[0][1],limiters[0][2])
 
-    np = multiprocessing.cpu_count()/2
+    np = multiprocessing.cpu_count()*3/4
     per_proc_check = int(math.ceil((primary[1]-primary[0]+1.0)/np))
 
     result_queue = multiprocessing.Queue()
@@ -177,12 +178,12 @@ class Random:
 
   @staticmethod
   def compute_possibilities_from_hourly_battles(num_players, rolls):
-    hrc = 10 # hidden rand calls, such as from map collisions or mystery rolls
+    hrc = 5 # hidden rand calls, such as from map collisions or mystery rolls
     assert(len(rolls)%2==0)
     limiters =     [['equal', rolls[0][0], rolls[0][1], 1, 1]]
     limiters.append(['equal', rolls[1][0], rolls[1][1], 1, 1])
     for lvl in xrange(2,len(rolls),2):
-      battle_rolls = 8 if rolls[lvl-2][0] > rolls[lvl-1][0] else 6
+      battle_rolls = 7 if rolls[lvl-2][0] > rolls[lvl-1][0] else 5
       limiters.append(['equal', rolls[lvl  ][0], rolls[lvl  ][1],
                                 7200*(1+num_players)+battle_rolls-1, 1+hrc])
       limiters.append(['equal', rolls[lvl+1][0], rolls[lvl+1][1], 1, 1])
@@ -377,11 +378,62 @@ def handle_funny_case():
   # answer: [(245748858511197, 345628, ((((((((245748858511197, 0), 1), 115211), 115212), 230419), 230420), 345627), 345628))]
   raise SystemExit("done.")
 
+def handle_beginning_after_reset():
+  limiters = [
+              ['equal', 112,  493, 1, 1],
+              ['equal', 339,  516, 1, 1],
+              ['equal', 384,  493, ((1+11)*7200)-4*3600+(5-1), 5],
+              ['equal', 295,  515, 1, 1],
+              ['equal', 231,  384, ((1+11)*7200)-4*3600+(7-1), 5],
+              ['equal', 190,  332, 1, 1],
+              ['equal', 155,  493, ((1+11)*7200)-4*3600+(7-1)+20, 35],
+              ['equal',  99,  358, 1, 1]
+             ]
+  print(list(Random.compute_possibilities(limiters)))
+  # answer: [(64260830912461, 216052, ((((((((64260830912461, 0), 1), 72006), 72007), 144015), 144016), 216051), 216052))]
+
+  raise SystemExit("Quitting Here")
+  rolls = [[155,493], [ 99,358],
+           [357,493], [ 29,557],
+           [325,384], [282,515],
+           [284,493], [403,426],
+           [337,493], [237,421]]
+  #print(list(Random.compute_possibilities_from_hourly_battles(11, rolls)))  # 11 players but quest ongoing
+  rolls = [[ 77,509], [150,421],
+           [ 91,384], [189,515],
+           [145,509], [203,332],
+           [383,493], [ 52,516],
+           [  4,493], [177,332]]
+
+  rolls = [[439,487], [323,521],
+           [144,487], [144,385],
+           [123,384], [343,557],
+           [340,493], [275,358]]
+  #print(list(Random.compute_possibilities_from_hourly_battles(11, rolls)))
+  # In the middle of a time-based-quest:
+  #2015-07-08 22:48:18<@idlerpg> pef [38/420] has challenged idlerpg [416/522] in combat and lost! 0 days, 01:00:40 is added to pef's clock.
+  #2015-07-08 22:48:18<@idlerpg> pef reaches next level in 0 days, 11:07:23.
+  #2015-07-08 23:48:21<@idlerpg> dlaw [349/385] has challenged nebkor [415/421] in combat and lost! 0 days, 07:58:45 is added to dlaw's clock.
+  #2015-07-08 23:48:21<@idlerpg> dlaw reaches next level in 5 days, 01:58:14.
+  #--- Day changed Thu Jul 09 2015
+  #2015-07-09 00:48:24<@idlerpg> yzhou [243/487] has challenged nebkor [385/421] in combat and lost! 0 days, 03:18:26 is added to yzhou's clock.
+  #2015-07-09 00:48:24<@idlerpg> yzhou reaches next level in 2 days, 02:33:20.
+  #2015-07-09 01:48:28<@idlerpg> pef [323/420] has challenged kniktas [122/521] in combat and won! 0 days, 00:53:35 is removed from pef's clock.
+  #2015-07-09 01:48:28<@idlerpg> pef reaches next level in 0 days, 07:13:38.
+  rolls = [[ 38,420], [416,522],
+           [349,385], [415,421],
+           [243,487], [385,421],
+           [323,420], [122,521]]
+  print(list(Random.compute_possibilities_from_hourly_battles(11, rolls)))
+  # Answer: [(25696289847270, 259220, ((((((((25696289847270, 0), 1), 86406), 86407), 172812), 172813), 259219), 259220))]
+
 #handle_local_case_a()
 #handle_original_case_b()
 #handle_original_case_a()
 #handle_early_april_case()
-handle_funny_case()
+#handle_funny_case()
+handle_beginning_after_reset()
+raise SystemExit("Stopping here.")
 
 if False:
   seeds = []

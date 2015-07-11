@@ -4,12 +4,14 @@ from collections import defaultdict
 import re
 import subprocess
 
-output = subprocess.check_output(['grep', '-A999999', 'BEGIN.LOGGING.*Wed Apr  1',
-                          '/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log'])
+#output = subprocess.check_output(['grep', '-A999999', 'BEGIN.LOGGING.*Wed Apr  1',
+#                          '/home/newren/.xchat2/xchatlogs/Palantir-#idlerpg.log'])
+output = subprocess.check_output(['cat',
+                          '/home/newren/irclogs/Palantir/#idlerpg.log'])
 groups = []
 everyone = set()
 for line in output.splitlines():
-  m = re.match(".*<idlerpg>\s*(.*) have been chosen", line)
+  m = re.match(".*<@idlerpg>\s*(.*) have been chosen", line)
   if m:
     participants = re.split(', (?:and )?', m.group(1))
     groups.append(participants)
