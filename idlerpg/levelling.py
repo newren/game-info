@@ -619,7 +619,6 @@ class IdlerpgStats(defaultdict):
           self[who]['online'] = False
       self[who]['stronline'] = 'yes' if self[who]['online'] else (
                                '???' if self[who]['online'] is None else 'no')
-      self[who]['relevant'] = bool(self[who]['level'] > self['elijah']['level']-2)
 
   def parse(self):
     try:
@@ -845,7 +844,7 @@ def expected_ttl(stats, who): # How much time-to-level decrease in next day
 def relevant_user(stats, who, show_who):
   if stats[who]['stronline'] == 'no' and not 'offline' in show_who:
     return False
-  if not (stats[who]['relevant'] or 'lowlevel' in show_who):
+  if 'highlevel' in show_who and (stats[who]['level'] <= stats['elijah']['level']-2):
     return False
   return True
 
@@ -1287,9 +1286,9 @@ def parse_args(rpgstats):
   parser.add_argument('--offline',
                       dest='who', action='append_const', const='offline',
                       help='Show information for offline players as well')
-  parser.add_argument('--low-levellers',
-                      dest='who', action='append_const', const='lowlevel',
-                      help='Show information for low level players as well')
+  parser.add_argument('--high-levellers',
+                      dest='who', action='append_const', const='highlevel',
+                      help='Show information for only high level players')
   args = parser.parse_args()
 
   # Make sure the log is parsed
