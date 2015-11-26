@@ -12,6 +12,11 @@ Determining the latest battle-adjusted itemsums folks are now using:
 Determining what level everyone has attained:
    grep 'has attained' ~/irclogs/Palantir/#idlerpg.log | sed -e 's/.*idlerpg>\s*//' -e 's/,[^,]*, has attained//' -e 's/!.*//' | awk '{cnt[$1]=$3} END{for (x in cnt){print cnt[x],x}}' | sort -n | less
 
+Determining calamity, godsend, and quest strings:
+   cat ~/irclogs/Palantir/#idlerpg.log | grep 'terrible calamity' | sed -e 's/.*idlerpg.\s*\w*.//' -e 's/\. This.*//' | sort | uniq -c | sort -rn
+   cat ~/irclogs/Palantir/#idlerpg.log | grep 'wondrous godsend' | sed -e 's/.*idlerpg.\s*\w*.//' -e 's/\! This.*//' | sort | uniq -c | sort -rn
+   cat ~/irclogs/Palantir/#idlerpg.log | grep 'have been chosen by the gods to' | sed -e 's/.*have been chosen by the gods to//' -e 's/\..*//' | sort | uniq -c | sort -rn
+
 Determining alignment; combination of (the first only goes back to when my logs started)
    grep alignment ~/irclogs/Palantir/#idlerpg.log | awk '{print $5 " => " $10'} | less
    grep forsaken ~/irclogs/Palantir/#idlerpg.log | awk {print\$5} | sort | uniq -c
