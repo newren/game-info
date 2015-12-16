@@ -246,7 +246,7 @@ class IdlerpgStats(defaultdict):
         raise SystemExit("Mismatch for {}; {} vs {}".format(who, oldlvl_guess, prev_level))
       self[who]['item_stats'][item] = (level, 100.0)
 
-      change = level - oldlvl_guess
+      change = level - prev_level
       factor = {'good':1.1, 'neutral':1.0, 'evil':0.9}[self[who]['alignment']]
       self[who]['itemsum'] += int(factor*change)
 
