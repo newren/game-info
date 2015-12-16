@@ -795,6 +795,8 @@ def solve_ttl_to_0(ttl, r, p):
   # Compute ttl_burn_time
   if p > 1: # Can't complete (in positive time)
     return float('inf')
+  if r*ttl+1-p < 0: # Can't complete (in positive time)
+    return float('inf')
   ttl_burn_time = (-1/r)*math.log((1-p)/(r*ttl+1-p))
 
   # Switch back to seconds
