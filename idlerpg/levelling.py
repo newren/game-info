@@ -240,18 +240,18 @@ class IdlerpgStats(defaultdict):
     self[who]['item_info'] = (None, None)
 
   def swap_items(self, winner, loser, item, new_level, old_level):
-    def record_new_item(who, level, expected_old_level):
-      oldlvl, confidence = self[who]['item_stats'][item]
-      if confidence >= 99 and abs(oldlvl - expected_old_level) > 9:
-        raise SystemExit("Mismatch for {}; {} vs {}".format(who, oldlvl, expected_old_level))
+    def record_new_item(who, level, prev_level):
+      oldlvl_guess, confidence = self[who]['item_stats'][item]
+      if confidence >= 99 and abs(oldlvl_guess - prev_level) > 9:
+        raise SystemExit("Mismatch for {}; {} vs {}".format(who, oldlvl_guess, prev_level))
       self[who]['item_stats'][item] = (level, 100.0)
 
-      change = level - oldlvl
+      change = level - oldlvl_guess
       factor = {'good':1.1, 'neutral':1.0, 'evil':0.9}[self[who]['alignment']]
       self[who]['itemsum'] += int(factor*change)
 
-    record_new_item(winner, new_level, expected_old_level = old_level)
-    record_new_item(loser,  old_level, expected_old_level = new_level)
+    record_new_item(winner, new_level, prev_level = old_level)
+    record_new_item(loser,  old_level, prev_level = new_level)
 
   def apply_attribute_modifications(self, attrib_list_changes, epoch):
     if attrib_list_changes:
