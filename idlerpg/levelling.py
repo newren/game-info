@@ -851,9 +851,14 @@ def relevant_user(stats, who, show_who):
   return True
 
 def print_summary_info(rpgstats, show_who):
+  print_expected = False
   # Print out all the information we've collected
-  brkln="--- --- ---- ------------ ---- ------------ ------------ ---------"
-  print "Lvl On? ISum  Time-to-Lvl Algn   Optimistic Expected TTL character"
+  if print_expected:
+    brkln="--- --- ---- ------------ ---- ------------ ------------ ---------"
+    print "Lvl On? ISum  Time-to-Lvl Algn   Optimistic Expected TTL character"
+  else:
+    brkln="--- --- ---- ------------ ---- ------------ ---------"
+    print "Lvl On? ISum  Time-to-Lvl Algn   Approx TTL character"
   last = True
   for who in sorted(rpgstats, key=lambda x:(rpgstats[x]['stronline'],rpgstats[x]['timeleft'])):
     if not relevant_user(rpgstats, who, show_who):
@@ -863,16 +868,19 @@ def print_summary_info(rpgstats, show_who):
     if assumed_on ^ last:
       print brkln
       last = assumed_on
+    format_string = '{:3d} {:3s} {:4d} {} {} {} {}'
     ettl1, ettl2 = expected_ttl(rpgstats, who)
-    print('{:3d} {:3s} {:4d} {} {} {} {} {}'.format(
+    final_args = (time_format(ettl1), who)
+    if print_expected:
+      format_string += ' {}'
+      final_args = (time_format(ettl1), time_format(ettl2), who)
+    print(format_string.format(
              rpgstats[who]['level'],
              on,
              rpgstats[who]['itemsum'],
              time_format(rpgstats[who]['timeleft']),
              rpgstats[who]['alignment'][0:4],
-             time_format(ettl1),
-             time_format(ettl2),
-             who))
+             *final_args))
   print("Quest: "+quest_info(rpgstats))
 
 def compute_burn_info(rpgstats, who):
