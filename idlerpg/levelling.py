@@ -664,9 +664,11 @@ def quest_info(stats):
 
 def battle_burn(stats, who):
   oncount = sum([1 for x in stats if stats[x]['online']])
+  battlers = sum([1 for x in stats if stats[x]['online'] and
+                                      stats[x]['level'] >= 45])
   odds_fight_per_day = 0
   if stats[who]['level'] >= 45:
-    odds_fight_per_day += 24.0/oncount # every hour, 1.0 selected to start fight
+    odds_fight_per_day += 24.0/battlers # every hour, 1 selected to start fight
   odds_fight_per_day += 1.5/oncount  # 1.5ish grid battles/day, from past stats
   # team battles are basically a wash; the reward is equal to the loss, so the
   # only probabilistic difference is if your itemsum is higher or lower than
