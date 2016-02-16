@@ -1146,7 +1146,8 @@ def show_quit_strategy(stats, quitters, show_who):
   # Find out any important folks who might go up a level before quest ends
   if stats.questers:
     possible_levellers = ""
-    if len(stats.quest_times[stats.quest_positions]) == 0:
+    if not stats.quest_time_left and \
+       len(stats.quest_times[stats.quest_positions]) == 0:
       print "No stats about this quest found; unknown who may level before the quest ends."
       return
     for who in sorted(stats, key=lambda x:stats[x]['level']):
