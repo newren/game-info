@@ -368,6 +368,10 @@ class IdlerpgStats(defaultdict):
       # I got disconnected somehow
       m = re.match(r'--- Log closed (.*)', line)
       if m:
+        if self.questers and 'elijah' in self.questers:
+          # If my log closed, I'll miss the "elijah's prudence and self-regard"
+          # message about the fact that I caused the quest to end.
+          self.quest_ended(epoch, successful=False)
         for who in self:
           if self[who]['online'] != None:
             self[who]['last_logbreak_seen'] = epoch  # FIXME: Should be epoch of reopening
