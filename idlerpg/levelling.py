@@ -248,7 +248,7 @@ class IdlerpgStats(defaultdict):
 
       change = level - prev_level
       factor = {'good':1.1, 'neutral':1.0, 'evil':0.9}[self[who]['alignment']]
-      self[who]['itemsum'] += int(factor*change)
+      self[who]['itemsum'] += int(round(factor*change))
 
     record_new_item(winner, new_level, prev_level = old_level)
     record_new_item(loser,  old_level, prev_level = new_level)
