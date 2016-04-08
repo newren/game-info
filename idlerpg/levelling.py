@@ -779,7 +779,7 @@ def quest_burn(stats, who):
   quests_per_day = 86400 / (average_quest_time + average_wait_time)
 
   # Determine antiburn
-  pen = min(86400*7, 15*1.14**stats[who]['level'])
+  pen = 15*1.14**stats[who]['level']
   antiburn = pen*quests_per_day*fail_quest_percentage
 
   # Find rates and return them
@@ -1119,7 +1119,7 @@ def show_quit_strategy(stats, quitters, show_who):
       continue
     penrate = 16 if who == quitters[0] else 15
     mult = 0.75 if who in quitters else 1
-    penalty = min(penrate*1.14**stats[who]['level'], 7*86400)
+    penalty = penrate*1.14**stats[who]['level']
     br1, br2, ab = get_burn_rates(stats, who)
 
     ettl_finish_opt = solve_ttl_to_0(mult*stats[who]['timeleft'], br1, 0)
