@@ -386,6 +386,7 @@ class IdlerpgStats(defaultdict):
         quester_list, start_pos, end_pos = m.groups()
         self.record_questers(IdlerpgStats.get_people_list(quester_list), epoch)
         self.quest_positions = start_pos+end_pos
+        self.quest_time_left = None
         continue
       m = re.match(r"(.*) have been chosen.*Quest to end in (\d+) days?, (\d{2}):(\d{2}):(\d{2})", line)
       if m:
