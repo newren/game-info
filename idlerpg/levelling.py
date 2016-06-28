@@ -620,7 +620,8 @@ class IdlerpgStats(defaultdict):
     for who in self:
       if self[who]['online'] is None:
         ettl_opt, ettl_exp = expected_ttl(self, who)
-        if ettl_opt+self[who]['last_logbreak_seen'] < now:
+        time_left_approx = min(ettl_opt, self[who]['timeleft'])
+        if time_left_approx + self[who]['last_logbreak_seen'] < now:
           self[who]['online'] = False
       self[who]['stronline'] = 'yes' if self[who]['online'] else (
                                '???' if self[who]['online'] is None else 'no')
